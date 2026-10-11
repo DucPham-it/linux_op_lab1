@@ -1,0 +1,1141 @@
+# LAB #10: PROMETHEUS & GRAFANA MONITORING - COMPLETE COMMAND REFERENCE & GUIDE
+**File:** `/home/archlinux/Projects/Linux/seminar.md`
+
+This document contains all the commands recommended for setting up the environment, provisioning the virtual machines, deploying the monitoring stack, and executing the mandatory demos for Seminar Lab #10. Every command is accompanied by a detailed explanation of what it does and why it is required.
+
+---
+
+# TABLE OF CONTENTS / MỤC LỤC
+- [ENGLISH VERSION](#english-version)
+  - [Part 1: Host Environment Setup (Arch Linux)](#part-1-host-environment-setup-arch-linux)
+  - [Part 2: Virtual Machine Provisioning (Automated via Cloud Image)](#part-2-virtual-machine-provisioning-automated-via-cloud-image)
+  - [Part 3: Configuring Target VM (mon-target, 512MB RAM)](#part-3-configuring-target-vm-mon-target-512mb-ram)
+  - [Part 4: Configuring Monitoring Server (mon-server, 1.5GB RAM)](#part-4-configuring-monitoring-server-mon-server-15gb-ram)
+  - [Part 5: Mandatory Demo Execution](#part-5-mandatory-demo-execution)
+- [PHIÊN BẢN TIẾNG VIỆT](#phiên-bản-tiếng-việt)
+  - [Phần 1: Thiết lập môi trường máy chủ (Arch Linux)](#phần-1-thiết-lập-môi-trường-máy-chủ-arch-linux)
+  - [Phần 2: Khởi tạo máy ảo (Tự động hóa qua Cloud Image)](#phần-2-khởi-tạo-máy-ảo-tự-động-hóa-qua-cloud-image)
+  - [Phần 3: Cấu hình máy ảo mục tiêu (mon-target, 512MB RAM)](#phần-3-cấu-hình-máy-ảo-mục-tiêu-mon-target-512mb-ram)
+  - [Phần 4: Cấu hình máy chủ giám sát (mon-server, 1.5GB RAM)](#phần-4-cấu-hình-máy-chủ-giám-sát-mon-server-15gb-ram)
+  - [Phần 5: Thực hiện các bài demo bắt buộc](#phần-5-thực-hiện-các-bài-demo-bắt-buộc)
+
+---
+
+# ENGLISH VERSION
+
+## PART 1: HOST ENVIRONMENT SETUP (ARCH LINUX)
+
+### 1. Install Virtualization & Networking Tools
+**Command:**
+```bash
+sudo pacman -Syu qemu-desktop libvirt virt-manager dnsmasq iptables-nft
+```
+
+**Explanation:**
+- `sudo`: Executes the package manager with root administrative privileges.
+- `pacman -Syu`: Synchronizes package databases (`-y`) and updates existing packages (`-u`) before installing (`-S`) to prevent partial upgrade states.
+- `qemu-desktop`: Installs QEMU (Quick Emulator) with desktop/graphical display support (SPICE, GTK, audio, virtio-gpu). It acts as the hypervisor device emulator.
+- `libvirt`: The system daemon and API layer providing unified management for virtual machines, virtual networks, and storage pools.
+- `virt-manager`: Graphical desktop application (Virtual Machine Manager) to configure, manage, and view guest VM screens easily.
+- `dnsmasq`: Lightweight DNS forwarder and DHCP server used by libvirt to automatically assign private IP addresses (e.g. `192.168.122.x`) to guest VMs.
+- `iptables-nft`: The nftables-backed translation layer for iptables rules, allowing libvirt to create NAT (Network Address Translation) firewall rules so VMs can access the Internet through the host machine.
+
+---
+
+### 2. Grant User Permissions for KVM & Libvirt
+**Command:**
+```bash
+sudo usermod -aG libvirt,kvm $USER
+```
+
+**Explanation:**
+- `usermod`: Modifies user account properties in the system.
+- `-aG` (append to Groups): Appends the specified groups without removing the user from other groups.
+- `libvirt`: Grants membership to the libvirt group, allowing your non-root user to manage VMs via virsh or virt-manager without sudo.
+- `kvm`: Grants read and write access to the hardware-accelerated device node `/dev/kvm`.
+- `$USER`: Shell environment variable expanding to your current username (`archlinux`).
+
+---
+
+### 3. Enable and Start the Libvirt Service
+**Command:**
+```bash
+sudo systemctl enable --now libvirtd
+```
+
+**Explanation:**
+- `systemctl`: Control utility for systemd system and service manager.
+- `enable`: Configures the service (and its socket units) to start automatically at boot.
+- `--now`: Starts the service immediately in the current session without requiring a reboot.
+- `libvirtd`: The main Libvirt background daemon.
+
+---
+
+### 4. Apply New Group Membership to Current Shell Session
+**Command:**
+```bash
+newgrp libvirt
+```
+
+**Explanation:**
+- In Linux, group membership additions normally require logging out and back in.
+- `newgrp` starts a subshell session with the 'libvirt' group ID immediately active, allowing you to test or run virsh commands right away without rebooting.
+
+---
+
+### 5. Set Libvirt Default Virtual Network to Auto-Start
+**Command:**
+```bash
+sudo virsh net-autostart default
+```
+
+**Explanation:**
+- `virsh`: Command-line interface for managing libvirt guest domains and networks.
+- `net-autostart`: Marks the specified virtual network to be automatically brought up whenever libvirtd starts (including system reboot).
+- `default`: The default virtual NAT network defined by libvirt (subnet `192.168.122.0/24`).
+
+---
+
+### 6. Reload Firewall Daemon Configuration
+**Command:**
+```bash
+sudo firewall-cmd --reload
+```
+
+**Explanation:**
+- `firewall-cmd`: Command-line client for firewalld.
+- `--reload`: Reloads firewall rules and zones from disk without interrupting active connections.
+- **Why this is needed:** Installing libvirt installs a new firewalld zone file (`/usr/lib/firewalld/zones/libvirt.xml`). Because firewalld was already running, it must reload its definitions so it recognizes the 'libvirt' zone and allows virsh to attach the virtual bridge (`virbr0`) without throwing zone lookup errors.
+
+---
+
+### 7. Start the Virtual Network
+**Command:**
+```bash
+sudo virsh net-start default
+```
+
+**Explanation:**
+- `net-start`: Activates the specified virtual network.
+- Creates the virtual bridge interface `virbr0` on the host, spawns a dnsmasq instance for DHCP/DNS, and configures NAT forwarding rules.
+
+---
+
+### 8. Verify Network Status
+**Command:**
+```bash
+sudo virsh net-list --all
+```
+
+**Explanation:**
+- Lists all configured virtual networks and displays their operational status (State: active) and persistence setting (Autostart: yes).
+
+---
+
+## PART 2: VIRTUAL MACHINE PROVISIONING (AUTOMATED VIA CLOUD IMAGE)
+
+**Requirements per syllabus:**
+- **VM 1 (Monitoring Server):**
+  - Name: `mon-server`
+  - RAM: `1536 MB` (1.5 GB)
+  - vCPU: `2`
+  - Disk: `15 GB`
+  - OS: `Debian 12 (Bookworm)`
+  - IP Assigned: `192.168.122.54`
+  - Services to run: Prometheus (`:9090`), Grafana (`:3000`), Alertmanager (`:9093`)
+
+- **VM 2 (Target Node):**
+  - Name: `mon-target`
+  - RAM: `512 MB`
+  - vCPU: `1`
+  - Disk: `10 GB`
+  - OS: `Debian 12 (Bookworm)`
+  - IP Assigned: `192.168.122.89`
+  - Services to run: Node Exporter (`:9100`), `stress-ng`
+
+---
+
+### 1. Download Official Debian 12 Minimal Cloud Image
+**Command:**
+```bash
+wget -O debian-12-generic-amd64.qcow2 https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
+```
+
+**Explanation:**
+- `wget`: Network downloader.
+- `-O`: Saves the downloaded file under the specified filename.
+- `debian-12-generic-amd64.qcow2`: Pre-installed, minimal Debian 12 cloud image supporting cloud-init configuration on first boot.
+
+---
+
+### 2. Create Independent Copy-on-Write (CoW) Overlay Disks
+**Commands:**
+```bash
+mkdir -p ~/vms
+qemu-img create -f qcow2 -F qcow2 -b ~/debian-12-generic-amd64.qcow2 ~/vms/mon-server.qcow2 15G
+qemu-img create -f qcow2 -F qcow2 -b ~/debian-12-generic-amd64.qcow2 ~/vms/mon-target.qcow2 10G
+```
+
+**Explanation:**
+- `qemu-img create`: Utility to initialize virtual disk image files.
+- `-f qcow2`: Target disk format (QEMU Copy-On-Write version 2).
+- `-F qcow2`: Specifies the format of the underlying backing file.
+- `-b ~/debian-12-generic-amd64.qcow2`: Base template image. All read operations come from this base file until modified.
+- `~/vms/mon-server.qcow2 15G`: Creates an overlay disk for VM 1 with a virtual capacity expanded to 15 GB.
+- `~/vms/mon-target.qcow2 10G`: Creates an overlay disk for VM 2 with a virtual capacity expanded to 10 GB.
+- **Why CoW:** Avoids duplicating the base 430 MB image, saving disk space and allowing instant provisioning without touching the original base file.
+
+---
+
+### 3. Prepare Cloud-Init Credentials
+**Command:**
+```bash
+echo "debian" > /tmp/vm-pass.txt
+```
+
+**Explanation:**
+- Creates a temporary file holding the default password (`debian`) to be injected into the cloud-init user accounts (both root and debian user) so console/sudo access works immediately.
+
+---
+
+### 4. Provision and Launch VM 1 (mon-server)
+**Command:**
+```bash
+virt-install --connect qemu:///system \
+  --name mon-server \
+  --memory 1536 \
+  --vcpus 2 \
+  --os-variant debian12 \
+  --disk path=/home/archlinux/vms/mon-server.qcow2,device=disk,bus=virtio \
+  --network network=default,model=virtio \
+  --cloud-init root-password-file=/tmp/vm-pass.txt,clouduser-ssh-key=/home/archlinux/.ssh/id_ed25519.pub \
+  --import \
+  --noautoconsole
+```
+
+**Explanation:**
+- `virt-install`: Command-line tool for provisioning new virtual machines under libvirt.
+- `--connect qemu:///system`: Directs the connection to the system-level hypervisor daemon.
+- `--name mon-server`: Unique domain name for the VM.
+- `--memory 1536`: Allocates 1536 MiB (1.5 GB) RAM.
+- `--vcpus 2`: Allocates 2 virtual CPU cores.
+- `--os-variant debian12`: Tells libvirt to tune kernel and device configurations for Debian 12.
+- `--disk path=...,bus=virtio`: Attaches the CoW disk using high-performance paravirtualized virtio bus.
+- `--network network=default,model=virtio`: Connects VM to `virbr0` with virtio NIC driver.
+- `--cloud-init root-password-file=...,clouduser-ssh-key=...`: Generates a temporary cloud-init NoCloud ISO that injects the host's SSH public key into `~/.ssh/authorized_keys` for the `debian` user and sets the root/user password.
+- `--import`: Tells virt-install to boot directly from an existing installed disk image rather than starting an OS installer.
+- `--noautoconsole`: Returns back to the shell prompt instead of locking into the VM serial console.
+
+---
+
+### 5. Provision and Launch VM 2 (mon-target)
+**Command:**
+```bash
+virt-install --connect qemu:///system \
+  --name mon-target \
+  --memory 512 \
+  --vcpus 1 \
+  --os-variant debian12 \
+  --disk path=/home/archlinux/vms/mon-target.qcow2,device=disk,bus=virtio \
+  --network network=default,model=virtio \
+  --cloud-init root-password-file=/tmp/vm-pass.txt,clouduser-ssh-key=/home/archlinux/.ssh/id_ed25519.pub \
+  --import \
+  --noautoconsole
+```
+
+**Explanation:**
+- Same parameters as above, tailored for VM 2 specs (512 MiB RAM, 1 vCPU, 10 GB disk).
+- Clean up password file after creation:
+  ```bash
+  rm /tmp/vm-pass.txt
+  ```
+
+---
+
+### 6. Verify Running VMs and Inspect IP Addresses
+**Commands:**
+```bash
+virsh -c qemu:///system list
+virsh -c qemu:///system domifaddr mon-server
+virsh -c qemu:///system domifaddr mon-target
+virsh -c qemu:///system net-dhcp-leases default
+```
+
+**Explanation:**
+- `domifaddr`: Queries the VM interface addresses allocated via libvirt DHCP.
+- **IP Allocations for this session:**
+  - `mon-server`: `192.168.122.54`
+  - `mon-target`: `192.168.122.89`
+
+---
+
+### 7. Access VMs via SSH from Arch Host
+**Commands:**
+```bash
+ssh debian@192.168.122.54   # Log into mon-server
+ssh debian@192.168.122.89   # Log into mon-target
+```
+
+**Explanation:**
+- Authenticates securely with your host SSH key (`id_ed25519`) without prompting for passwords.
+- The default username is `debian` with full sudo capabilities (password: `debian`).
+
+---
+
+## PART 3: CONFIGURING TARGET VM (mon-target, 512MB RAM)
+
+Log into VM 2 (via console or SSH):
+
+### 1. Install Node Exporter and Stress Testing Tool
+**Commands (Debian/Ubuntu):**
+```bash
+sudo apt update
+sudo apt install -y prometheus-node-exporter stress-ng
+```
+
+**Explanation:**
+- `prometheus-node-exporter`: Daemon that collects system hardware and OS metrics from the Linux kernel (`/proc`, `/sys`) and exposes them via HTTP in Prometheus format.
+- `stress-ng`: Workload generation tool used to stress CPU, RAM, and I/O to trigger performance thresholds during the alert demo.
+
+---
+
+### 2. Enable and Start Node Exporter
+**Commands:**
+```bash
+sudo systemctl enable --now prometheus-node-exporter
+```
+
+**Explanation:**
+- Ensures the exporter runs on boot and starts listening immediately on port 9100.
+
+---
+
+### 3. Verify Node Exporter Metrics Output Locally
+**Command:**
+```bash
+curl http://localhost:9100/metrics | head -n 30
+```
+
+**Explanation:**
+- `curl`: HTTP client to fetch web content from the command line.
+- `http://localhost:9100/metrics`: The standard endpoint where Node Exporter presents plain-text time-series metrics.
+- `head -n 30`: Prints the first 30 lines to confirm metrics (HELP and TYPE descriptors).
+
+---
+
+### 4. Find the Target VM's IP Address
+**Command:**
+```bash
+ip -br addr show
+```
+
+**Explanation:**
+- Displays IP addresses in brief tabular format. Note the IP assigned on interface `enp1s0` or `eth0` (e.g., `192.168.122.50`). You will use this IP in VM 1's config.
+
+---
+
+## PART 4: CONFIGURING MONITORING SERVER (mon-server, 1.5GB RAM)
+
+Log into VM 1:
+
+### 1. Install Prometheus, Alertmanager, and Grafana
+**Commands (Debian/Ubuntu):**
+```bash
+# Install Prometheus & Alertmanager from official Debian repositories
+sudo apt update
+sudo apt install -y prometheus prometheus-alertmanager
+
+# Install Grafana from official Grafana Labs repository (Debian 12 doesn't include grafana in base repos)
+sudo apt install -y apt-transport-https software-properties-common wget gpg
+sudo mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt update
+sudo apt install -y grafana
+```
+
+**Explanation:**
+- `prometheus`: Time-series database engine that scrapes and evaluates alert rules.
+- `prometheus-alertmanager`: Receives alert triggers from Prometheus, deduplicates, groups, and routes notifications.
+- `grafana`: Interactive web UI for query visualization and dashboard creation.
+- `apt-transport-https`, `wget`, `gpg`: Prerequisites to securely fetch and verify Grafana's signed APT repository via HTTPS using GPG authentication keys.
+
+---
+
+### 2. Configure Prometheus (Scrape Target & Rule Files)
+**Edit configuration:**
+```bash
+sudo nano /etc/prometheus/prometheus.yml
+```
+
+**Configure complete `/etc/prometheus/prometheus.yml`:**
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node_exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["192.168.122.89:9100"]
+```
+
+**Explanation:**
+- `rule_files`: Directs Prometheus to load alert definitions from `/etc/prometheus/alert_rules.yml`.
+- `job_name`: Label used to identify the group of instances being monitored.
+- `scrape_interval`: Frequency at which Prometheus issues HTTP GET requests to `/metrics`. Set to 5s for fast real-time lab demonstrations.
+- `targets`: The IP address and port of VM 2's Node Exporter.
+
+---
+
+### 3. Configure Alert Rule for High CPU Usage
+**Create rule file:**
+```bash
+sudo nano /etc/prometheus/alert_rules.yml
+```
+
+**Add content:**
+```yaml
+groups:
+  - name: host_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} High CPU Usage"
+          description: "CPU usage has exceeded 80% for more than 1 minute (Current: {{ $value }}%)."
+```
+
+**Explanation:**
+- `alert`: Name of the alert.
+- `expr`: PromQL condition. Calculates non-idle CPU percentage over the last 1 minute. Fires if > 80%.
+- `for: 1m`: Must remain true continuously for 1 minute before firing (transitions from Inactive -> Pending -> Firing).
+- Link this file into `/etc/prometheus/prometheus.yml` under:
+  ```yaml
+  rule_files:
+    - "/etc/prometheus/alert_rules.yml"
+  ```
+
+---
+
+### 4. Enable and Restart Monitoring Services
+**Commands:**
+```bash
+sudo systemctl enable --now prometheus
+sudo systemctl enable --now prometheus-alertmanager
+sudo systemctl enable --now grafana-server
+sudo systemctl restart prometheus
+```
+
+**Explanation:**
+- Applies all configuration changes and verifies that all services are active.
+- Grafana is now accessible at `http://192.168.122.54:3000` (default login: `admin`/`admin`).
+- Prometheus UI is accessible at `http://192.168.122.54:9090`.
+- Alertmanager UI is accessible at `http://192.168.122.54:9093`.
+
+---
+
+## PART 5: MANDATORY DEMO EXECUTION
+
+### DEMO 1: Real-time Dashboard in Grafana
+**Steps:**
+1. Open web browser on Host: `http://192.168.122.54:3000`
+2. Default user account and password is `admin`/`admin`.
+3. Navigate to **Connections** -> **Data Sources** -> **Add Prometheus**.  
+   Set URL: `http://localhost:9090` and click **"Save & test"**.
+4. Go to **Dashboards** -> **Import** -> Enter ID `"1860"` (Node Exporter Full) -> **Load**.
+5. Select the Prometheus data source and click **Import**.
+
+**Result:** Full live visualization of CPU, RAM, Disk, and Network for the target VM.
+
+---
+
+### DEMO 2: PromQL Queries & Rate Explanation
+Execute these in Prometheus Web UI (`http://192.168.122.54:9090/graph`):
+
+1. **Real-time CPU Usage (%):**
+   ```promql
+   100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+   ```
+   - **Why rate() is mandatory:** `node_cpu_seconds_total` is a monotonically increasing `COUNTER` tracking total seconds CPU spent in states since boot. A raw counter value cannot represent current load; `rate()` calculates per-second increase over a 1-minute time window.
+
+2. **RAM Usage (%):**
+   ```promql
+   (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+   ```
+   - Uses `GAUGE` metrics representing absolute values fluctuating up and down.
+
+3. **Root Filesystem Disk Usage (%):**
+   ```promql
+   (1 - (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100
+   ```
+   - Calculates used percentage of disk space by filtering on `mountpoint="/"`.
+
+---
+
+### DEMO 3: Alert Lifecycle Simulation (Pending -> Firing)
+
+1. On VM 2 (`mon-target`), run:
+   ```bash
+   stress-ng --cpu 1 --timeout 120s
+   ```
+   **Explanation:**
+   - `--cpu 1`: Maxes out 1 CPU core to 100%.
+   - `--timeout 120s`: Runs the workload for 2 minutes.
+
+2. On VM 1 (`mon-server`), open Prometheus UI -> **Alerts** tab:
+   - **0s - 10s:** Rule matches -> State becomes **PENDING** (yellow).
+   - **At 60s:** Duration threshold met -> State becomes **FIRING** (red).
+   - Open Alertmanager UI (`:9093`) to show the active firing alert.
+   - **After 120s:** `stress-ng` exits, CPU drops -> State returns to **INACTIVE** (green).
+
+---
+
+### DEMO 4: Troubleshooting ("Lost Exporter" vs. "Dead Host")
+
+**Objective:**
+Demonstrate that Prometheus metric `up{job="node_exporter"} == 0` only indicates metric collection failure. Sysadmins must combine it with network-level checks (`ping`) to distinguish between application crashes and total infrastructure outages.
+
+#### Case A: Node Exporter Process Failure (Target Host is ALIVE, Service DEAD)
+1. Simulate service failure on `mon-target` (VM 2):
+   ```bash
+   sudo systemctl stop prometheus-node-exporter
+   ```
+
+2. Verify metric status on `mon-server` (Prometheus Web UI `http://192.168.122.54:9090/graph`):
+   - **Query:**
+     ```promql
+     up{job="node_exporter"}
+     ```
+   - **Result:** Value drops from `1` to `0`.
+
+3. Run network connectivity check on `mon-server` terminal:
+   ```bash
+   ping -c 3 192.168.122.89
+   ```
+   - **Observed Output:**
+     ```text
+     3 packets transmitted, 3 received, 0% packet loss, time ...
+     ```
+     *(ICMP replies received; IP network layer and Linux kernel on VM 2 are alive).*
+
+4. **Diagnostic Conclusion:**
+   - The machine hardware, OS, and networking are completely healthy.
+   - **Root cause:** The exporter daemon crashed or was manually stopped.
+   - **Remediation:** No physical or virtualization intervention needed. Just inspect service logs (`journalctl -u prometheus-node-exporter`) and restart the daemon:  
+     On `mon-target`:
+     ```bash
+     sudo systemctl start prometheus-node-exporter
+     ```
+   - Verify recovery on Prometheus UI: `up{job="node_exporter"}` transitions back to `1`.
+
+#### Case B: Full Host Crash (Target Host is COMPLETELY DEAD / Powered Off)
+1. Simulate sudden server crash / power failure on `mon-target` (VM 2):
+   ```bash
+   sudo poweroff
+   ```
+
+2. Verify metric status on `mon-server` (Prometheus Web UI `http://192.168.122.54:9090/graph`):
+   - **Query:**
+     ```promql
+     up{job="node_exporter"}
+     ```
+   - **Result:** Value remains `0` (or shows `"context deadline exceeded / connection refused"`).
+
+3. Run network connectivity check on `mon-server` terminal:
+   ```bash
+   ping -c 3 192.168.122.89
+   ```
+   - **Observed Output:**
+     ```text
+     From 192.168.122.54 icmp_seq=1 Destination Host Unreachable
+     3 packets transmitted, 0 received, +3 errors, 100% packet loss.
+     ```
+
+4. **Diagnostic Conclusion:**
+   - Total infrastructure failure (Power outage, Kernel Panic, VM crash, or network isolation).
+   - **Remediation:** SSH is impossible. Requires hypervisor/datacenter-level intervention.  
+     From Arch Host machine:
+     ```bash
+     virsh -c qemu:///system start mon-target
+     ```
+   - After booting up, verify VM recovery:
+     ```bash
+     ping -c 3 192.168.122.89  # (0% packet loss)
+     ```
+     *(In Prometheus UI: `up{job="node_exporter"}` returns to `1`)*.
+
+---
+
+# PHIÊN BẢN TIẾNG VIỆT
+
+## BÀI THỰC HÀNH #10: GIÁM SÁT VỚI PROMETHEUS & GRAFANA - TÀI LIỆU HƯỚNG DẪN & TRA CỨU LỆNH ĐẦY ĐỦ
+**Tệp:** `/home/archlinux/Projects/Linux/seminar.md`
+
+Tài liệu này bao gồm toàn bộ các câu lệnh được khuyến nghị để thiết lập môi trường, khởi tạo các máy ảo, triển khai hệ thống giám sát (monitoring stack), và thực hiện các bài demo bắt buộc cho Seminar Lab #10. Mỗi câu lệnh đều đi kèm với giải thích chi tiết về chức năng và lý do cần thiết.
+
+---
+
+## PHẦN 1: THIẾT LẬP MÔI TRƯỜNG MÁY CHỦ (ARCH LINUX)
+
+### 1. Cài đặt các công cụ ảo hóa & mạng
+**Câu lệnh:**
+```bash
+sudo pacman -Syu qemu-desktop libvirt virt-manager dnsmasq iptables-nft
+```
+
+**Giải thích:**
+- `sudo`: Thực thi trình quản lý gói với đặc quyền quản trị viên (root).
+- `pacman -Syu`: Đồng bộ hóa cơ sở dữ liệu gói (`-y`) và cập nhật các gói hiện có (`-u`) trước khi cài đặt (`-S`) để tránh tình trạng nâng cấp không đồng bộ (partial upgrade).
+- `qemu-desktop`: Cài đặt QEMU (Quick Emulator) hỗ trợ giao diện đồ họa/desktop (SPICE, GTK, âm thanh, virtio-gpu). Nó đóng vai trò là trình giả lập thiết bị hypervisor.
+- `libvirt`: System daemon và tầng API cung cấp khả năng quản lý thống nhất cho các máy ảo, mạng ảo và vùng lưu trữ (storage pools).
+- `virt-manager`: Ứng dụng đồ họa trên desktop (Virtual Machine Manager) giúp cấu hình, quản lý và xem màn hình máy ảo khách (guest VM) một cách dễ dàng.
+- `dnsmasq`: Dịch vụ chuyển tiếp DNS và máy chủ DHCP dung lượng nhẹ được libvirt sử dụng để tự động cấp phát địa chỉ IP nội bộ (ví dụ: `192.168.122.x`) cho các máy ảo khách.
+- `iptables-nft`: Lớp biên dịch trên nền tảng nftables cho các quy tắc iptables, cho phép libvirt tạo các quy tắc tường lửa NAT (Network Address Translation) để các máy ảo có thể truy cập Internet thông qua máy chủ (host).
+
+---
+
+### 2. Cấp quyền người dùng cho KVM & Libvirt
+**Câu lệnh:**
+```bash
+sudo usermod -aG libvirt,kvm $USER
+```
+
+**Giải thích:**
+- `usermod`: Chỉnh sửa các thuộc tính tài khoản người dùng trong hệ thống.
+- `-aG` (append to Groups): Thêm người dùng vào các nhóm được chỉ định mà không xóa người dùng khỏi các nhóm khác.
+- `libvirt`: Thêm người dùng vào nhóm libvirt, cho phép tài khoản không phải root quản lý máy ảo thông qua virsh hoặc virt-manager mà không cần sudo.
+- `kvm`: Cấp quyền đọc và ghi vào thiết bị tăng tốc phần cứng `/dev/kvm`.
+- `$USER`: Biến môi trường shell trả về tên người dùng hiện tại (`archlinux`).
+
+---
+
+### 3. Kích hoạt và khởi chạy dịch vụ Libvirt
+**Câu lệnh:**
+```bash
+sudo systemctl enable --now libvirtd
+```
+
+**Giải thích:**
+- `systemctl`: Tiện ích điều khiển hệ thống systemd và trình quản lý dịch vụ.
+- `enable`: Cấu hình dịch vụ (và các socket unit của nó) tự động khởi chạy khi khởi động máy.
+- `--now`: Khởi chạy dịch vụ ngay lập tức trong phiên hiện tại mà không cần khởi động lại máy.
+- `libvirtd`: Tiến trình nền (daemon) chính của Libvirt.
+
+---
+
+### 4. Áp dụng quyền thành viên nhóm mới vào phiên Shell hiện tại
+**Câu lệnh:**
+```bash
+newgrp libvirt
+```
+
+**Giải thích:**
+- Trong Linux, việc thêm người dùng vào nhóm mới thường yêu cầu đăng xuất và đăng nhập lại.
+- `newgrp` khởi động một phiên subshell với group ID 'libvirt' được kích hoạt ngay lập tức, cho phép bạn kiểm tra hoặc chạy các lệnh virsh ngay mà không cần khởi động lại.
+
+---
+
+### 5. Cấu hình mạng ảo mặc định của Libvirt tự động khởi chạy
+**Câu lệnh:**
+```bash
+sudo virsh net-autostart default
+```
+
+**Giải thích:**
+- `virsh`: Giao diện dòng lệnh để quản lý các domain (máy ảo) và mạng của libvirt.
+- `net-autostart`: Đánh dấu mạng ảo được chỉ định sẽ tự động kích hoạt mỗi khi libvirtd khởi chạy (bao gồm cả khi khởi động lại hệ thống).
+- `default`: Mạng NAT ảo mặc định do libvirt định nghĩa (dải mạng `192.168.122.0/24`).
+
+---
+
+### 6. Tải lại cấu hình tường lửa (Firewall Daemon)
+**Câu lệnh:**
+```bash
+sudo firewall-cmd --reload
+```
+
+**Giải thích:**
+- `firewall-cmd`: Trình điều khiển dòng lệnh cho firewalld.
+- `--reload`: Tải lại các quy tắc tường lửa và vùng (zones) từ đĩa mà không làm gián đoạn các kết nối đang hoạt động.
+- **Lý do cần thiết:** Việc cài đặt libvirt sẽ thêm một tệp zone mới cho firewalld (`/usr/lib/firewalld/zones/libvirt.xml`). Do firewalld đã chạy từ trước, nó cần tải lại các định nghĩa để nhận diện zone 'libvirt' và cho phép virsh gắn cầu mạng ảo (`virbr0`) mà không bị lỗi tra cứu zone.
+
+---
+
+### 7. Khởi động mạng ảo
+**Câu lệnh:**
+```bash
+sudo virsh net-start default
+```
+
+**Giải thích:**
+- `net-start`: Kích hoạt mạng ảo được chỉ định.
+- Tạo giao diện cầu ảo `virbr0` trên máy chủ, khởi chạy một tiến trình dnsmasq phục vụ DHCP/DNS, và cấu hình các quy tắc chuyển tiếp NAT.
+
+---
+
+### 8. Kiểm tra trạng thái mạng
+**Câu lệnh:**
+```bash
+sudo virsh net-list --all
+```
+
+**Giải thích:**
+- Liệt kê tất cả các mạng ảo đã được cấu hình và hiển thị trạng thái hoạt động (State: active) cùng với thiết lập tự khởi động (Autostart: yes).
+
+---
+
+## PHẦN 2: KHỞI TẠO MÁY ẢO (TỰ ĐỘNG HÓA QUA CLOUD IMAGE)
+
+**Yêu cầu theo đề cương:**
+- **VM 1 (Máy chủ giám sát - Monitoring Server):**
+  - Tên: `mon-server`
+  - RAM: `1536 MB` (1.5 GB)
+  - vCPU: `2`
+  - Dung lượng đĩa: `15 GB`
+  - Hệ điều hành: `Debian 12 (Bookworm)`
+  - IP được cấp phát: `192.168.122.54`
+  - Dịch vụ chạy: Prometheus (`:9090`), Grafana (`:3000`), Alertmanager (`:9093`)
+
+- **VM 2 (Node mục tiêu giám sát - Target Node):**
+  - Tên: `mon-target`
+  - RAM: `512 MB`
+  - vCPU: `1`
+  - Dung lượng đĩa: `10 GB`
+  - Hệ điều hành: `Debian 12 (Bookworm)`
+  - IP được cấp phát: `192.168.122.89`
+  - Dịch vụ chạy: Node Exporter (`:9100`), `stress-ng`
+
+---
+
+### 1. Tải Cloud Image tối giản chính thức của Debian 12
+**Câu lệnh:**
+```bash
+wget -O debian-12-generic-amd64.qcow2 https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2
+```
+
+**Giải thích:**
+- `wget`: Công cụ tải tệp qua mạng.
+- `-O`: Lưu tệp đã tải xuống với tên tệp được chỉ định.
+- `debian-12-generic-amd64.qcow2`: Image Debian 12 cloud tối giản, cài đặt sẵn, hỗ trợ cấu hình cloud-init ngay trong lần khởi động đầu tiên.
+
+---
+
+### 2. Tạo các đĩa phủ Copy-on-Write (CoW) độc lập
+**Các câu lệnh:**
+```bash
+mkdir -p ~/vms
+qemu-img create -f qcow2 -F qcow2 -b ~/debian-12-generic-amd64.qcow2 ~/vms/mon-server.qcow2 15G
+qemu-img create -f qcow2 -F qcow2 -b ~/debian-12-generic-amd64.qcow2 ~/vms/mon-target.qcow2 10G
+```
+
+**Giải thích:**
+- `qemu-img create`: Tiện ích khởi tạo các tệp ảnh đĩa ảo.
+- `-f qcow2`: Định dạng đĩa đích (QEMU Copy-On-Write phiên bản 2).
+- `-F qcow2`: Chỉ định định dạng của tệp nền (backing file).
+- `-b ~/debian-12-generic-amd64.qcow2`: Tệp image mẫu cơ sở. Mọi thao tác đọc đều lấy từ tệp gốc này cho đến khi có dữ liệu được ghi đè/sửa đổi.
+- `~/vms/mon-server.qcow2 15G`: Tạo đĩa phủ cho VM 1 với dung lượng ảo mở rộng lên 15 GB.
+- `~/vms/mon-target.qcow2 10G`: Tạo đĩa phủ cho VM 2 với dung lượng ảo mở rộng lên 10 GB.
+- **Tại sao dùng CoW:** Tránh nhân bản tệp ảnh gốc 430 MB, tiết kiệm dung lượng đĩa và cho phép khởi tạo máy ảo gần như tức thì mà không can thiệp vào tệp gốc.
+
+---
+
+### 3. Chuẩn bị thông tin xác thực cho Cloud-Init
+**Câu lệnh:**
+```bash
+echo "debian" > /tmp/vm-pass.txt
+```
+
+**Giải thích:**
+- Tạo tệp tạm chứa mật khẩu mặc định (`debian`) để đưa vào các tài khoản người dùng cloud-init (cả tài khoản root và debian) giúp truy cập console/sudo hoạt động ngay.
+
+---
+
+### 4. Khởi tạo và kích hoạt VM 1 (mon-server)
+**Câu lệnh:**
+```bash
+virt-install --connect qemu:///system \
+  --name mon-server \
+  --memory 1536 \
+  --vcpus 2 \
+  --os-variant debian12 \
+  --disk path=/home/archlinux/vms/mon-server.qcow2,device=disk,bus=virtio \
+  --network network=default,model=virtio \
+  --cloud-init root-password-file=/tmp/vm-pass.txt,clouduser-ssh-key=/home/archlinux/.ssh/id_ed25519.pub \
+  --import \
+  --noautoconsole
+```
+
+**Giải thích:**
+- `virt-install`: Công cụ dòng lệnh để khởi tạo các máy ảo mới dưới sự quản lý của libvirt.
+- `--connect qemu:///system`: Điều hướng kết nối tới tiến trình hypervisor ở cấp độ hệ thống.
+- `--name mon-server`: Tên domain duy nhất cho máy ảo.
+- `--memory 1536`: Phân bổ 1536 MiB (1.5 GB) RAM.
+- `--vcpus 2`: Phân bổ 2 nhân CPU ảo.
+- `--os-variant debian12`: Báo cho libvirt tối ưu cấu hình kernel và thiết bị cho Debian 12.
+- `--disk path=...,bus=virtio`: Gắn đĩa CoW sử dụng bus virtio chuẩn hóa bán ảo hóa hiệu năng cao.
+- `--network network=default,model=virtio`: Kết nối máy ảo vào mạng `virbr0` với driver mạng virtio.
+- `--cloud-init root-password-file=...,clouduser-ssh-key=...`: Tạo một tệp NoCloud ISO tạm thời để đưa khóa công khai SSH của máy host vào `~/.ssh/authorized_keys` của người dùng `debian` và thiết lập mật khẩu cho root/user.
+- `--import`: Yêu cầu virt-install khởi động trực tiếp từ ảnh đĩa đã cài đặt sẵn thay vì chạy trình cài đặt hệ điều hành (OS installer).
+- `--noautoconsole`: Trả về dấu nhắc lệnh shell ngay thay vì bị khóa vào serial console của máy ảo.
+
+---
+
+### 5. Khởi tạo và kích hoạt VM 2 (mon-target)
+**Câu lệnh:**
+```bash
+virt-install --connect qemu:///system \
+  --name mon-target \
+  --memory 512 \
+  --vcpus 1 \
+  --os-variant debian12 \
+  --disk path=/home/archlinux/vms/mon-target.qcow2,device=disk,bus=virtio \
+  --network network=default,model=virtio \
+  --cloud-init root-password-file=/tmp/vm-pass.txt,clouduser-ssh-key=/home/archlinux/.ssh/id_ed25519.pub \
+  --import \
+  --noautoconsole
+```
+
+**Giải thích:**
+- Các tham số tương tự như trên, được tùy chỉnh theo thông số cấu hình VM 2 (512 MiB RAM, 1 vCPU, đĩa 10 GB).
+- Xóa tệp mật khẩu tạm thời sau khi khởi tạo:
+  ```bash
+  rm /tmp/vm-pass.txt
+  ```
+
+---
+
+### 6. Kiểm tra các máy ảo đang chạy và xem địa chỉ IP
+**Các câu lệnh:**
+```bash
+virsh -c qemu:///system list
+virsh -c qemu:///system domifaddr mon-server
+virsh -c qemu:///system domifaddr mon-target
+virsh -c qemu:///system net-dhcp-leases default
+```
+
+**Giải thích:**
+- `domifaddr`: Truy vấn các địa chỉ mạng của máy ảo được cấp phát qua libvirt DHCP.
+- **Các địa chỉ IP được cấp phát trong phiên này:**
+  - `mon-server`: `192.168.122.54`
+  - `mon-target`: `192.168.122.89`
+
+---
+
+### 7. Truy cập máy ảo qua SSH từ máy chủ Arch
+**Các câu lệnh:**
+```bash
+ssh debian@192.168.122.54   # Đăng nhập vào mon-server
+ssh debian@192.168.122.89   # Đăng nhập vào mon-target
+```
+
+**Giải thích:**
+- Xác thực bảo mật bằng SSH key của máy host (`id_ed25519`) mà không cần nhập mật khẩu.
+- Tên người dùng mặc định là `debian` với đầy đủ quyền sudo (mật khẩu: `debian`).
+
+---
+
+## PHẦN 3: CẤU HÌNH MÁY ẢO MỤC TIÊU (mon-target, 512MB RAM)
+
+Đăng nhập vào VM 2 (thông qua console hoặc SSH):
+
+### 1. Cài đặt Node Exporter và công cụ kiểm thử tải (Stress Testing)
+**Các câu lệnh (Debian/Ubuntu):**
+```bash
+sudo apt update
+sudo apt install -y prometheus-node-exporter stress-ng
+```
+
+**Giải thích:**
+- `prometheus-node-exporter`: Tiến trình dịch vụ thu thập các chỉ số phần cứng và hệ điều hành từ Linux kernel (`/proc`, `/sys`) và xuất chúng qua HTTP dưới định dạng chuẩn của Prometheus.
+- `stress-ng`: Công cụ tạo tải công việc được sử dụng để ép tải CPU, RAM và I/O nhằm kích hoạt các ngưỡng cảnh báo trong bài demo alert.
+
+---
+
+### 2. Kích hoạt và khởi chạy Node Exporter
+**Các câu lệnh:**
+```bash
+sudo systemctl enable --now prometheus-node-exporter
+```
+
+**Giải thích:**
+- Đảm bảo exporter tự khởi động cùng hệ thống và bắt đầu lắng nghe ngay trên cổng 9100.
+
+---
+
+### 3. Kiểm tra kết quả xuất chỉ số (Metrics) của Node Exporter cục bộ
+**Câu lệnh:**
+```bash
+curl http://localhost:9100/metrics | head -n 30
+```
+
+**Giải thích:**
+- `curl`: Trình gửi yêu cầu HTTP để lấy nội dung web từ giao diện dòng lệnh.
+- `http://localhost:9100/metrics`: Điểm cuối chuẩn (endpoint) nơi Node Exporter cung cấp các chuỗi thời gian (time-series metrics) dưới dạng văn bản thuần.
+- `head -n 30`: In ra 30 dòng đầu tiên để xác nhận các chỉ số (các bộ mô tả HELP và TYPE).
+
+---
+
+### 4. Tìm địa chỉ IP của máy ảo mục tiêu
+**Câu lệnh:**
+```bash
+ip -br addr show
+```
+
+**Giải thích:**
+- Hiển thị các địa chỉ IP dưới định dạng bảng ngắn gọn. Ghi nhận IP được gán trên giao diện `enp1s0` hoặc `eth0` (ví dụ: `192.168.122.50`). Bạn sẽ sử dụng IP này trong cấu hình của VM 1.
+
+---
+
+## PHẦN 4: CẤU HÌNH MÁY CHỦ GIÁM SÁT (mon-server, 1.5GB RAM)
+
+Đăng nhập vào VM 1:
+
+### 1. Cài đặt Prometheus, Alertmanager và Grafana
+**Các câu lệnh (Debian/Ubuntu):**
+```bash
+# Cài đặt Prometheus & Alertmanager từ kho lưu trữ chính thức của Debian
+sudo apt update
+sudo apt install -y prometheus prometheus-alertmanager
+
+# Cài đặt Grafana từ kho lưu trữ chính thức của Grafana Labs (Debian 12 không có grafana trong kho cơ sở)
+sudo apt install -y apt-transport-https software-properties-common wget gpg
+sudo mkdir -p /etc/apt/keyrings/
+wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+sudo apt update
+sudo apt install -y grafana
+```
+
+**Giải thích:**
+- `prometheus`: Hệ cơ sở dữ liệu chuỗi thời gian (time-series database) chịu trách nhiệm thu thập (scrape) và đánh giá các quy tắc cảnh báo (alert rules).
+- `prometheus-alertmanager`: Tiếp nhận các cảnh báo được kích hoạt từ Prometheus, khử trùng lặp (deduplicate), nhóm lại và định tuyến gửi thông báo.
+- `grafana`: Giao diện web trực quan tương tác phục vụ việc truy vấn dữ liệu và tạo bảng điều khiển (dashboard).
+- `apt-transport-https`, `wget`, `gpg`: Các gói điều kiện cần để tải về và xác thực an toàn kho lưu trữ APT đã ký của Grafana qua HTTPS bằng khóa xác thực GPG.
+
+---
+
+### 2. Cấu hình Prometheus (Mục tiêu thu thập & Tệp quy tắc)
+**Chỉnh sửa cấu hình:**
+```bash
+sudo nano /etc/prometheus/prometheus.yml
+```
+
+**Nội dung cấu hình đầy đủ của `/etc/prometheus/prometheus.yml`:**
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+    - job_name: "node_exporter"
+      scrape_interval: 5s
+      static_configs:
+        - targets: ["192.168.122.89:9100"]
+```
+
+**Giải thích:**
+- `rule_files`: Chỉ dẫn Prometheus tải các định nghĩa quy tắc cảnh báo từ `/etc/prometheus/alert_rules.yml`.
+- `job_name`: Nhãn định danh cho nhóm các thực thể (instances) được giám sát.
+- `scrape_interval`: Tần suất Prometheus gửi yêu cầu HTTP GET đến `/metrics`. Đặt là 5s để phục vụ các bài trình diễn trực tiếp nhanh chóng trong phòng lab.
+- `targets`: Địa chỉ IP và cổng của Node Exporter trên VM 2.
+
+---
+
+### 3. Cấu hình quy tắc cảnh báo khi mức sử dụng CPU cao (High CPU Usage)
+**Tạo tệp quy tắc:**
+```bash
+sudo nano /etc/prometheus/alert_rules.yml
+```
+
+**Thêm nội dung:**
+```yaml
+groups:
+  - name: host_alerts
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} High CPU Usage"
+          description: "CPU usage has exceeded 80% for more than 1 minute (Current: {{ $value }}%)."
+```
+
+**Giải thích:**
+- `alert`: Tên cảnh báo.
+- `expr`: Điều kiện PromQL. Tính toán phần trăm CPU không ở trạng thái rảnh rỗi (non-idle) trong 1 phút qua. Cảnh báo kích hoạt nếu > 80%.
+- `for: 1m`: Điều kiện phải duy trì đúng liên tục trong 1 phút trước khi kích hoạt chính thức (chuyển đổi từ Inactive -> Pending -> Firing).
+- Khai báo liên kết tệp này vào `/etc/prometheus/prometheus.yml` dưới mục:
+  ```yaml
+  rule_files:
+    - "/etc/prometheus/alert_rules.yml"
+  ```
+
+---
+
+### 4. Kích hoạt và khởi động lại các dịch vụ giám sát
+**Các câu lệnh:**
+```bash
+sudo systemctl enable --now prometheus
+sudo systemctl enable --now prometheus-alertmanager
+sudo systemctl enable --now grafana-server
+sudo systemctl restart prometheus
+```
+
+**Giải thích:**
+- Áp dụng tất cả các thay đổi cấu hình và xác nhận rằng tất cả dịch vụ đều đang hoạt động.
+- Grafana hiện có thể truy cập tại `http://192.168.122.54:3000` (đăng nhập mặc định: `admin`/`admin`).
+- Giao diện Prometheus truy cập tại `http://192.168.122.54:9090`.
+- Giao diện Alertmanager truy cập tại `http://192.168.122.54:9093`.
+
+---
+
+## PHẦN 5: THỰC HIỆN CÁC BÀI DEMO BẮT BUỘC
+
+### DEMO 1: Bảng điều khiển thời gian thực trên Grafana
+**Các bước thực hiện:**
+1. Mở trình duyệt web trên máy Host: `http://192.168.122.54:3000`
+2. Tài khoản và mật khẩu mặc định là `admin`/`admin`.
+3. Điều hướng tới **Connections** -> **Data Sources** -> **Add Prometheus**.  
+   Đặt URL: `http://localhost:9090` và nhấn **"Save & test"**.
+4. Truy cập **Dashboards** -> **Import** -> Nhập ID `"1860"` (Node Exporter Full) -> **Load**.
+5. Chọn nguồn dữ liệu Prometheus và nhấn **Import**.
+
+**Kết quả:** Trực quan hóa trực tiếp toàn bộ dữ liệu CPU, RAM, Ổ đĩa và Mạng của máy ảo mục tiêu.
+
+---
+
+### DEMO 2: Truy vấn PromQL & Giải thích hàm rate()
+Thực thi các câu truy vấn này trong giao diện web Prometheus (`http://192.168.122.54:9090/graph`):
+
+1. **Mức sử dụng CPU thời gian thực (%):**
+   ```promql
+   100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+   ```
+   - **Lý do bắt buộc dùng hàm rate():** `node_cpu_seconds_total` là một chỉ số `COUNTER` tăng đơn điệu theo thời gian ghi lại tổng số giây CPU đã trải qua ở các trạng thái kể từ khi khởi động. Giá trị thô của bộ đếm không thể biểu diễn tải hiện tại; hàm `rate()` tính toán mức tăng trên mỗi giây trong một khoảng thời gian 1 phút.
+
+2. **Mức sử dụng RAM (%):**
+   ```promql
+   (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+   ```
+   - Sử dụng các chỉ số `GAUGE` đại diện cho các giá trị tuyệt đối có thể tăng hoặc giảm liên tục.
+
+3. **Mức sử dụng đĩa hệ thống tệp gốc (%):**
+   ```promql
+   (1 - (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100
+   ```
+   - Tính toán phần trăm dung lượng đĩa đã sử dụng bằng cách lọc theo `mountpoint="/"`.
+
+---
+
+### DEMO 3: Mô phỏng vòng đời cảnh báo (Alert Lifecycle: Pending -> Firing)
+
+1. Trên VM 2 (`mon-target`), chạy lệnh:
+   ```bash
+   stress-ng --cpu 1 --timeout 120s
+   ```
+   **Giải thích:**
+   - `--cpu 1`: Ép 1 nhân CPU hoạt động hết công suất 100%.
+   - `--timeout 120s`: Duy trì tải công việc trong vòng 2 phút.
+
+2. Trên VM 1 (`mon-server`), mở giao diện Prometheus UI -> tab **Alerts**:
+   - **Từ 0s - 10s:** Khớp quy tắc -> Trạng thái chuyển thành **PENDING** (màu vàng).
+   - **Tại 60s:** Đạt ngưỡng thời gian duy trì -> Trạng thái chuyển thành **FIRING** (màu đỏ).
+   - Mở giao diện Alertmanager UI (`:9093`) để xem cảnh báo đang kích hoạt (firing).
+   - **Sau 120s:** `stress-ng` kết thúc, CPU hạ nhiệt -> Trạng thái trở về **INACTIVE** (màu xanh lá).
+
+---
+
+### DEMO 4: Xử lý sự cố ("Mất Exporter" vs. "Sập Host hoàn toàn")
+
+**Mục tiêu:**
+Chứng minh rằng chỉ số Prometheus `up{job="node_exporter"} == 0` chỉ phản ánh sự cố thu thập chỉ số (metrics). Quản trị viên hệ thống (Sysadmin) phải kết hợp kiểm tra ở tầng mạng (lệnh `ping`) để phân biệt giữa việc ứng dụng bị sập và toàn bộ hạ tầng ngừng hoạt động.
+
+#### Trường hợp A: Tiến trình Node Exporter gặp sự cố (Host mục tiêu VẪN SỐNG, Dịch vụ CHẾT)
+1. Mô phỏng sự cố dừng dịch vụ trên `mon-target` (VM 2):
+   ```bash
+   sudo systemctl stop prometheus-node-exporter
+   ```
+
+2. Kiểm tra trạng thái chỉ số trên `mon-server` (Prometheus Web UI `http://192.168.122.54:9090/graph`):
+   - **Truy vấn:**
+     ```promql
+     up{job="node_exporter"}
+     ```
+   - **Kết quả:** Giá trị giảm từ `1` xuống `0`.
+
+3. Kiểm tra khả năng kết nối mạng trên terminal của `mon-server`:
+   ```bash
+   ping -c 3 192.168.122.89
+   ```
+   - **Kết quả quan sát:**
+     ```text
+     3 packets transmitted, 3 received, 0% packet loss, time ...
+     ```
+     *(Đã nhận được phản hồi ICMP; tầng mạng IP và Linux kernel trên VM 2 vẫn hoạt động bình thường).*
+
+4. **Kết luận chẩn đoán:**
+   - Phần cứng, hệ điều hành và mạng của máy ảo hoàn toàn khỏe mạnh.
+   - **Nguyên nhân gốc rễ:** Tiến trình daemon của exporter đã bị sập hoặc bị dừng thủ công.
+   - **Cách khắc phục:** Không cần can thiệp vật lý hay ảo hóa. Chỉ cần kiểm tra nhật ký dịch vụ (`journalctl -u prometheus-node-exporter`) và khởi động lại daemon:  
+     Trên `mon-target`:
+     ```bash
+     sudo systemctl start prometheus-node-exporter
+     ```
+   - Xác nhận phục hồi trên Prometheus UI: `up{job="node_exporter"}` chuyển trạng thái trở lại `1`.
+
+#### Trường hợp B: Sập toàn bộ máy chủ (Host mục tiêu HOÀN TOÀN TẮT / Mất nguồn)
+1. Mô phỏng máy chủ bị sập đột ngột / mất nguồn trên `mon-target` (VM 2):
+   ```bash
+   sudo poweroff
+   ```
+
+2. Kiểm tra trạng thái chỉ số trên `mon-server` (Prometheus Web UI `http://192.168.122.54:9090/graph`):
+   - **Truy vấn:**
+     ```promql
+     up{job="node_exporter"}
+     ```
+   - **Kết quả:** Giá trị giữ nguyên là `0` (hoặc hiển thị `"context deadline exceeded / connection refused"`).
+
+3. Kiểm tra khả năng kết nối mạng trên terminal của `mon-server`:
+   ```bash
+   ping -c 3 192.168.122.89
+   ```
+   - **Kết quả quan sát:**
+     ```text
+     From 192.168.122.54 icmp_seq=1 Destination Host Unreachable
+     3 packets transmitted, 0 received, +3 errors, 100% packet loss.
+     ```
+
+4. **Kết luận chẩn đoán:**
+   - Toàn bộ hạ tầng gặp sự cố (Mất nguồn, Kernel Panic, sập máy ảo, hoặc cô lập mạng).
+   - **Cách khắc phục:** Không thể truy cập qua SSH. Yêu cầu can thiệp ở tầng hypervisor / trung tâm dữ liệu.  
+     Từ máy chủ Arch Host:
+     ```bash
+     virsh -c qemu:///system start mon-target
+     ```
+   - Sau khi máy ảo khởi động xong, kiểm tra phục hồi:
+     ```bash
+     ping -c 3 192.168.122.89  # (0% packet loss)
+     ```
+     *(Trên giao diện Prometheus UI: `up{job="node_exporter"}` quay trở lại giá trị `1`)*.
