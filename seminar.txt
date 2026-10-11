@@ -1084,3 +1084,210 @@ Trường hợp B: Sập toàn bộ máy chủ (Host mục tiêu HOÀN TOÀN T�
 ================================================================================
 KẾT THÚC TÀI LIỆU
 ================================================================================
+
+
+================================================================================
+APPENDIX / PHỤ LỤC: WSL2 GUIDE FOR WINDOWS USERS / HƯỚNG DẪN WSL2 CHO WINDOWS
+================================================================================
+
+--------------------------------------------------------------------------------
+ENGLISH: GETTING STARTED WITH WSL2 (WINDOWS SUBSYSTEM FOR LINUX)
+--------------------------------------------------------------------------------
+
+1. Introduction
+   Windows Subsystem for Linux (WSL2) allows Windows 10 and 11 users to run a
+   genuine Linux kernel inside a lightweight virtual machine. It provides full
+   system call compatibility, fast file system performance, and native Linux
+   package management (apt), making it ideal for practicing Linux administration,
+   networking, and monitoring without dual-booting.
+
+2. Prerequisites
+   - Windows 10 (Version 2004, Build 19041 or higher) or Windows 11.
+   - Hardware virtualization enabled in BIOS/UEFI (Intel VT-x or AMD-V).
+   - Check in Windows Task Manager -> Performance tab -> CPU -> "Virtualization: Enabled".
+
+3. Installing WSL2 on Windows
+   Open PowerShell or Windows Command Prompt as Administrator and run:
+     wsl --install
+
+   Notes:
+   - This command automatically enables required Windows features (Virtual Machine
+     Platform, Windows Subsystem for Linux), downloads the latest Linux kernel, and
+     installs Ubuntu as the default distribution.
+   - To install Debian 12 specifically (matching this lab):
+       wsl --install -d Debian
+   - To list available distributions:
+       wsl --list --online
+   - Restart your computer if Windows prompts you to do so.
+
+4. Basic WSL Management Commands (Run from Windows PowerShell)
+   - Check installed distributions and WSL versions:
+       wsl --list --verbose   (or: wsl -l -v)
+   - Ensure WSL2 is the default version:
+       wsl --set-default-version 2
+   - Shut down all running WSL distributions:
+       wsl --shutdown
+   - Launch your default Linux distribution:
+       wsl
+
+5. Initial Linux Setup inside WSL2
+   When launching WSL for the first time, set your Linux username and password.
+   Then update and upgrade your packages:
+     sudo apt update && sudo apt upgrade -y
+
+   Install essential command-line tools:
+     sudo apt install -y build-essential curl wget git htop net-tools dnsutils jq
+
+6. Enable systemd in WSL2 (Required for systemctl services)
+   Modern WSL2 supports systemd, which is needed to run services like libvirtd,
+   Prometheus, and Grafana using 'systemctl'.
+   Edit /etc/wsl.conf inside WSL:
+     sudo nano /etc/wsl.conf
+
+   Add the following lines:
+     [boot]
+     systemd=true
+
+   Save (Ctrl+O, Enter) and exit (Ctrl+X).
+   In Windows PowerShell, restart WSL to apply:
+     wsl --shutdown
+   Open WSL again and verify:
+     systemctl status
+
+7. Enable Nested Virtualization (For running KVM / QEMU inside WSL2)
+   In Windows, open or create the file:
+     C:\Users\<Your-Windows-Username>\.wslconfig
+   Add:
+     [wsl2]
+     nestedVirtualization=true
+
+   In PowerShell, restart WSL:
+     wsl --shutdown
+   Verify KVM acceleration is available inside WSL:
+     ls -l /dev/kvm
+
+8. Installing Monitoring Tools inside WSL2
+   - Install Prometheus & Node Exporter:
+       sudo apt install -y prometheus prometheus-node-exporter
+       sudo systemctl enable --now prometheus
+       sudo systemctl enable --now prometheus-node-exporter
+
+   - Install Grafana:
+       sudo apt install -y apt-transport-https software-properties-common wget gpg
+       sudo mkdir -p /etc/apt/keyrings/
+       wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+       echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+       sudo apt update
+       sudo apt install -y grafana
+       sudo systemctl enable --now grafana-server
+
+9. Accessing Services from Windows
+   WSL2 automatically bridges network ports to the Windows host:
+   - Grafana UI: Open Windows web browser and go to http://localhost:3000
+   - Prometheus UI: Open Windows web browser and go to http://localhost:9090
+   - Node Exporter Metrics: Open http://localhost:9100/metrics
+   - Access Linux files from Windows Explorer: Type \\wsl$ in the File Explorer address bar.
+   - VS Code integration: Install the "WSL" extension in VS Code on Windows, then run
+     'code .' from any folder inside WSL2.
+
+
+--------------------------------------------------------------------------------
+TIẾNG VIỆT: HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG WSL2 CHO NGƯỜI DÙNG WINDOWS
+--------------------------------------------------------------------------------
+
+1. Giới thiệu về WSL2
+   Windows Subsystem for Linux 2 (WSL2) cho phép người dùng Windows 10 và 11 chạy
+   một nhân Linux (Linux kernel) thực thụ bên trong máy ảo siêu nhẹ. WSL2 tương thích
+   hoàn toàn với các system call của Linux, tốc độ đọc ghi tệp nhanh và sử dụng
+   trình quản lý gói chuẩn của Linux (apt). Điều này giúp bạn dễ dàng thực hành quản trị
+   Linux, mạng và giám sát (Prometheus/Grafana) mà không cần cài đặt song song (dual-boot).
+
+2. Yêu cầu hệ thống
+   - Windows 10 (Phiên bản 2004, Build 19041 trở lên) hoặc Windows 11.
+   - Đã bật ảo hóa phần cứng (Hardware Virtualization) trong BIOS/UEFI (Intel VT-x hoặc AMD-V).
+   - Kiểm tra trong Task Manager của Windows -> tab Performance -> CPU -> "Virtualization: Enabled".
+
+3. Cài đặt WSL2 trên Windows
+   Mở PowerShell hoặc Command Prompt trên Windows với quyền Quản trị viên (Run as Administrator) và chạy:
+     wsl --install
+
+   Lưu ý:
+   - Lệnh này sẽ tự động bật các tính năng cần thiết của Windows (Virtual Machine Platform,
+     Windows Subsystem for Linux), tải về Linux kernel mới nhất và cài đặt Ubuntu mặc định.
+   - Nếu bạn muốn cài đặt Debian 12 (để hoàn toàn giống môi trường trong bài lab):
+       wsl --install -d Debian
+   - Xem danh sách các bản phân phối Linux khả dụng:
+       wsl --list --online
+   - Khởi động lại máy tính nếu Windows yêu cầu.
+
+4. Các lệnh quản lý WSL cơ bản (Chạy từ PowerShell Windows)
+   - Kiểm tra các bản Linux đã cài và phiên bản WSL:
+       wsl --list --verbose   (hoặc: wsl -l -v)
+   - Đảm bảo WSL2 là phiên bản mặc định:
+       wsl --set-default-version 2
+   - Tắt hoàn toàn tất cả các máy WSL đang chạy:
+       wsl --shutdown
+   - Mở terminal Linux mặc định:
+       wsl
+
+5. Cấu hình ban đầu bên trong WSL2
+   Lần đầu tiên mở WSL, bạn sẽ được yêu cầu tạo tài khoản và mật khẩu Linux.
+   Sau đó, cập nhật cơ sở dữ liệu gói:
+     sudo apt update && sudo apt upgrade -y
+
+   Cài đặt các công cụ dòng lệnh cơ bản:
+     sudo apt install -y build-essential curl wget git htop net-tools dnsutils jq
+
+6. Bật systemd trong WSL2 (Bắt buộc để chạy các dịch vụ quản lý bằng systemctl)
+   Các bản WSL2 mới hỗ trợ systemd, cần thiết để chạy các dịch vụ nền như libvirtd,
+   Prometheus, Grafana qua 'systemctl'.
+   Chỉnh sửa tệp /etc/wsl.conf trong WSL:
+     sudo nano /etc/wsl.conf
+
+   Thêm nội dung sau:
+     [boot]
+     systemd=true
+
+   Lưu tệp (Ctrl+O, Enter) và thoát (Ctrl+X).
+   Trong PowerShell Windows, khởi động lại WSL để áp dụng:
+     wsl --shutdown
+   Mở lại WSL và kiểm tra trạng thái systemd:
+     systemctl status
+
+7. Kích hoạt ảo hóa lồng (Nested Virtualization để chạy KVM / QEMU trong WSL2)
+   Trên Windows, mở hoặc tạo tệp:
+     C:\Users\<Tên-Người-Dùng-Windows>\.wslconfig
+   Thêm nội dung:
+     [wsl2]
+     nestedVirtualization=true
+
+   Trong PowerShell, tắt WSL:
+     wsl --shutdown
+   Mở lại WSL và kiểm tra tăng tốc phần cứng KVM:
+     ls -l /dev/kvm
+
+8. Cài đặt các công cụ giám sát trong WSL2
+   - Cài đặt Prometheus & Node Exporter:
+       sudo apt install -y prometheus prometheus-node-exporter
+       sudo systemctl enable --now prometheus
+       sudo systemctl enable --now prometheus-node-exporter
+
+   - Cài đặt Grafana:
+       sudo apt install -y apt-transport-https software-properties-common wget gpg
+       sudo mkdir -p /etc/apt/keyrings/
+       wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+       echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+       sudo apt update
+       sudo apt install -y grafana
+       sudo systemctl enable --now grafana-server
+
+9. Truy cập các dịch vụ từ trình duyệt Windows
+   WSL2 tự động chuyển tiếp các cổng mạng (ports) sang máy chủ Windows:
+   - Giao diện Grafana: Mở trình duyệt web trên Windows và truy cập http://localhost:3000
+   - Giao diện Prometheus: Mở trình duyệt web trên Windows và truy cập http://localhost:9090
+   - Chỉ số Node Exporter: Mở http://localhost:9100/metrics
+   - Mở tệp Linux từ File Explorer Windows: Nhập \\wsl$ vào thanh địa chỉ của File Explorer.
+   - Tích hợp VS Code: Cài extension "WSL" trong VS Code trên Windows, sau đó gõ
+     'code .' ngay từ terminal WSL2.
+
+================================================================================

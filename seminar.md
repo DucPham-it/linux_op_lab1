@@ -18,6 +18,9 @@ This document contains all the commands recommended for setting up the environme
   - [Phần 3: Cấu hình máy ảo mục tiêu (mon-target, 512MB RAM)](#phần-3-cấu-hình-máy-ảo-mục-tiêu-mon-target-512mb-ram)
   - [Phần 4: Cấu hình máy chủ giám sát (mon-server, 1.5GB RAM)](#phần-4-cấu-hình-máy-chủ-giám-sát-mon-server-15gb-ram)
   - [Phần 5: Thực hiện các bài demo bắt buộc](#phần-5-thực-hiện-các-bài-demo-bắt-buộc)
+- [APPENDIX / PHỤ LỤC: WSL2 GUIDE FOR WINDOWS USERS](#appendix--phụ-lục-wsl2-guide-for-windows-users--hướng-dẫn-wsl2-cho-windows)
+  - [English: Getting Started with WSL2](#english-getting-started-with-wsl2-windows-subsystem-for-linux)
+  - [Tiếng Việt: Hướng dẫn cài đặt và sử dụng WSL2](#tiếng-việt-hướng-dẫn-cài-đặt-và-sử-dụng-wsl2-cho-người-dùng-windows)
 
 ---
 
@@ -1139,3 +1142,262 @@ Chứng minh rằng chỉ số Prometheus `up{job="node_exporter"} == 0` chỉ p
      ping -c 3 192.168.122.89  # (0% packet loss)
      ```
      *(Trên giao diện Prometheus UI: `up{job="node_exporter"}` quay trở lại giá trị `1`)*.
+
+
+---
+
+# APPENDIX / PHỤ LỤC: WSL2 GUIDE FOR WINDOWS USERS / HƯỚNG DẪN WSL2 CHO WINDOWS
+
+---
+
+## ENGLISH: GETTING STARTED WITH WSL2 (WINDOWS SUBSYSTEM FOR LINUX)
+
+### 1. Introduction
+Windows Subsystem for Linux 2 (WSL2) allows Windows 10 and 11 users to run a genuine Linux kernel inside a lightweight virtual machine. It provides full system call compatibility, fast file system performance, and native Linux package management (`apt`), making it ideal for practicing Linux administration, networking, and monitoring without dual-booting.
+
+### 2. Prerequisites
+- **OS:** Windows 10 (Version 2004, Build 19041 or higher) or Windows 11.
+- **Hardware Virtualization:** Enabled in BIOS/UEFI (Intel VT-x or AMD-V).
+- *Verify:* Open Windows **Task Manager** &rarr; **Performance** tab &rarr; **CPU** &rarr; check **"Virtualization: Enabled"**.
+
+### 3. Installing WSL2 on Windows
+Open **PowerShell** or **Command Prompt** as Administrator and run:
+```powershell
+wsl --install
+```
+
+> [!NOTE]
+> - This command automatically enables the required Windows features (Virtual Machine Platform, Windows Subsystem for Linux), downloads the latest Linux kernel, and installs Ubuntu by default.
+> - To install **Debian 12** specifically (matching this lab):
+>   ```powershell
+>   wsl --install -d Debian
+>   ```
+> - To list all available Linux distributions:
+>   ```powershell
+>   wsl --list --online
+>   ```
+> - Restart your PC if prompted by Windows.
+
+### 4. Basic WSL Management Commands (Run in Windows PowerShell)
+- **Check installed distros and WSL versions:**
+  ```powershell
+  wsl --list --verbose   # or: wsl -l -v
+  ```
+- **Set WSL2 as default version:**
+  ```powershell
+  wsl --set-default-version 2
+  ```
+- **Shut down all running WSL instances:**
+  ```powershell
+  wsl --shutdown
+  ```
+- **Launch default Linux distro:**
+  ```powershell
+  wsl
+  ```
+
+### 5. Initial Linux Setup inside WSL2
+When opening WSL for the first time, create your Linux username and password. Then update packages:
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+Install essential command-line tools:
+```bash
+sudo apt install -y build-essential curl wget git htop net-tools dnsutils jq
+```
+
+### 6. Enable systemd in WSL2 (Required for `systemctl` services)
+Modern WSL2 supports `systemd`, which is needed to run background services like `libvirtd`, `prometheus`, and `grafana-server` via `systemctl`.
+
+Edit `/etc/wsl.conf` inside WSL:
+```bash
+sudo nano /etc/wsl.conf
+```
+
+Add the following lines:
+```ini
+[boot]
+systemd=true
+```
+
+Save (`Ctrl+O`, `Enter`) and exit (`Ctrl+X`). In PowerShell, restart WSL:
+```powershell
+wsl --shutdown
+```
+Reopen WSL and verify:
+```bash
+systemctl status
+```
+
+### 7. Enable Nested Virtualization (For running KVM / QEMU inside WSL2)
+To run virtual machines via KVM/QEMU inside WSL2, enable nested virtualization on the Windows host.
+Create or edit `C:\Users\<Your-Windows-Username>\.wslconfig` and add:
+```ini
+[wsl2]
+nestedVirtualization=true
+```
+
+In PowerShell, restart WSL:
+```powershell
+wsl --shutdown
+```
+
+Verify KVM hardware acceleration is available inside WSL:
+```bash
+ls -l /dev/kvm
+```
+
+### 8. Installing Monitoring Tools inside WSL2
+- **Install Prometheus & Node Exporter:**
+  ```bash
+  sudo apt install -y prometheus prometheus-node-exporter
+  sudo systemctl enable --now prometheus
+  sudo systemctl enable --now prometheus-node-exporter
+  ```
+
+- **Install Grafana:**
+  ```bash
+  sudo apt install -y apt-transport-https software-properties-common wget gpg
+  sudo mkdir -p /etc/apt/keyrings/
+  wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+  echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+  sudo apt update
+  sudo apt install -y grafana
+  sudo systemctl enable --now grafana-server
+  ```
+
+### 9. Accessing Services from Windows
+WSL2 automatically maps ports to the Windows host network:
+- **Grafana Web UI:** Open browser on Windows &rarr; `http://localhost:3000` (default login: `admin`/`admin`).
+- **Prometheus Web UI:** Open browser on Windows &rarr; `http://localhost:9090`.
+- **Node Exporter Metrics:** Open browser on Windows &rarr; `http://localhost:9100/metrics`.
+- **Access Linux Files in Windows Explorer:** Type `\\wsl$` in the Windows File Explorer address bar.
+- **VS Code Integration:** Install the **"WSL"** extension in VS Code on Windows, then run `code .` inside any WSL2 directory.
+
+---
+
+## TIẾNG VIỆT: HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG WSL2 CHO NGƯỜI DÙNG WINDOWS
+
+### 1. Giới thiệu về WSL2
+Windows Subsystem for Linux 2 (WSL2) cho phép người dùng Windows 10 và 11 chạy một nhân Linux (Linux kernel) thực thụ bên trong máy ảo siêu nhẹ. WSL2 tương thích hoàn toàn với các lệnh hệ thống (system call) của Linux, tốc độ đọc ghi tệp nhanh và sử dụng trình quản lý gói chuẩn của Linux (`apt`). Điều này giúp bạn dễ dàng thực hành quản trị Linux, cấu hình mạng và hệ thống giám sát (Prometheus/Grafana) mà không cần cài đặt hai hệ điều hành song song (dual-boot).
+
+### 2. Yêu cầu hệ thống
+- **Hệ điều hành:** Windows 10 (Phiên bản 2004, Build 19041 trở lên) hoặc Windows 11.
+- **Ảo hóa phần cứng (Hardware Virtualization):** Bật trong BIOS/UEFI (Intel VT-x hoặc AMD-V).
+- *Kiểm tra:* Mở **Task Manager** trên Windows &rarr; tab **Performance** &rarr; mục **CPU** &rarr; kiểm tra dòng **"Virtualization: Enabled"**.
+
+### 3. Cài đặt WSL2 trên Windows
+Mở **PowerShell** hoặc **Command Prompt** với quyền Quản trị viên (**Run as Administrator**) và thực thi:
+```powershell
+wsl --install
+```
+
+> [!NOTE]
+> - Câu lệnh này sẽ tự động bật các tính năng cần thiết của Windows (Virtual Machine Platform, Windows Subsystem for Linux), tải bản Linux kernel mới nhất và cài đặt bản phân phối Ubuntu mặc định.
+> - Để cài đặt **Debian 12** (phù hợp với môi trường của bài lab này):
+>   ```powershell
+>   wsl --install -d Debian
+>   ```
+> - Để xem danh sách các bản Linux có thể cài đặt:
+>   ```powershell
+>   wsl --list --online
+>   ```
+> - Khởi động lại máy tính nếu Windows yêu cầu.
+
+### 4. Các lệnh quản lý WSL cơ bản (Chạy trên Windows PowerShell)
+- **Kiểm tra các bản phân phối đã cài đặt và phiên bản WSL:**
+  ```powershell
+  wsl --list --verbose   # hoặc: wsl -l -v
+  ```
+- **Đặt WSL2 làm phiên bản mặc định:**
+  ```powershell
+  wsl --set-default-version 2
+  ```
+- **Tắt toàn bộ các máy ảo WSL đang chạy:**
+  ```powershell
+  wsl --shutdown
+  ```
+- **Khởi động bản Linux mặc định:**
+  ```powershell
+  wsl
+  ```
+
+### 5. Cấu hình ban đầu bên trong WSL2
+Khi mở WSL lần đầu tiên, hãy đặt tên người dùng (username) và mật khẩu (password). Sau đó cập nhật các gói hệ thống:
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+Cài đặt các gói công cụ cơ bản:
+```bash
+sudo apt install -y build-essential curl wget git htop net-tools dnsutils jq
+```
+
+### 6. Bật systemd trong WSL2 (Bắt buộc để chạy các dịch vụ quản lý qua `systemctl`)
+Các phiên bản WSL2 hiện tại đã hỗ trợ `systemd`, đây là thành phần bắt buộc để chạy các dịch vụ nền như `libvirtd`, `prometheus`, `grafana-server` thông qua `systemctl`.
+
+Chỉnh sửa tệp `/etc/wsl.conf` trong terminal WSL:
+```bash
+sudo nano /etc/wsl.conf
+```
+
+Thêm nội dung sau:
+```ini
+[boot]
+systemd=true
+```
+
+Lưu tệp (`Ctrl+O`, `Enter`) và thoát (`Ctrl+X`). Sau đó trên PowerShell của Windows, tắt WSL để áp dụng:
+```powershell
+wsl --shutdown
+```
+Mở lại WSL và kiểm tra:
+```bash
+systemctl status
+```
+
+### 7. Kích hoạt ảo hóa lồng (Nested Virtualization để chạy KVM / QEMU trong WSL2)
+Để chạy các máy ảo bằng KVM/QEMU bên trong WSL2, bạn cần kích hoạt ảo hóa lồng trên máy chủ Windows.
+Mở hoặc tạo tệp `C:\Users\<Tên-Người-Dùng-Windows>\.wslconfig` và thêm vào:
+```ini
+[wsl2]
+nestedVirtualization=true
+```
+
+Trong PowerShell, khởi động lại WSL:
+```powershell
+wsl --shutdown
+```
+
+Kiểm tra xem thiết bị tăng tốc ảo hóa KVM đã xuất hiện trong WSL hay chưa:
+```bash
+ls -l /dev/kvm
+```
+
+### 8. Cài đặt các công cụ giám sát trong WSL2
+- **Cài đặt Prometheus & Node Exporter:**
+  ```bash
+  sudo apt install -y prometheus prometheus-node-exporter
+  sudo systemctl enable --now prometheus
+  sudo systemctl enable --now prometheus-node-exporter
+  ```
+
+- **Cài đặt Grafana:**
+  ```bash
+  sudo apt install -y apt-transport-https software-properties-common wget gpg
+  sudo mkdir -p /etc/apt/keyrings/
+  wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+  echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee /etc/apt/sources.list.d/grafana.list
+  sudo apt update
+  sudo apt install -y grafana
+  sudo systemctl enable --now grafana-server
+  ```
+
+### 9. Truy cập các dịch vụ từ trình duyệt Windows
+WSL2 tự động ánh xạ cổng mạng sang Windows:
+- **Giao diện Grafana:** Mở trình duyệt trên Windows &rarr; `http://localhost:3000` (đăng nhập mặc định: `admin`/`admin`).
+- **Giao diện Prometheus:** Mở trình duyệt trên Windows &rarr; `http://localhost:9090`.
+- **Xem chỉ số Node Exporter:** Mở trình duyệt trên Windows &rarr; `http://localhost:9100/metrics`.
+- **Truy cập tệp Linux từ File Explorer Windows:** Nhập `\\wsl$` vào thanh địa chỉ của Windows File Explorer.
+- **Tích hợp VS Code:** Cài đặt extension **"WSL"** trong VS Code trên Windows, sau đó gõ lệnh `code .` tại bất kỳ thư mục nào trong WSL2.
