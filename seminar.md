@@ -21,6 +21,9 @@ This document contains all the commands recommended for setting up the environme
 - [APPENDIX / PHỤ LỤC: WSL2 GUIDE FOR WINDOWS USERS](#appendix--phụ-lục-wsl2-guide-for-windows-users--hướng-dẫn-wsl2-cho-windows)
   - [English: Getting Started with WSL2](#english-getting-started-with-wsl2-windows-subsystem-for-linux)
   - [Tiếng Việt: Hướng dẫn cài đặt và sử dụng WSL2](#tiếng-việt-hướng-dẫn-cài-đặt-và-sử-dụng-wsl2-cho-người-dùng-windows)
+- [APPENDIX / PHỤ LỤC: FEDORA GUIDE (HOST & WSL2)](#appendix--phụ-lục-fedora-guide-host--wsl2--hướng-dẫn-dành-cho-fedora)
+  - [English: Fedora Host Environment Setup & Fedora on WSL2](#english-fedora-host-environment-setup--fedora-on-wsl2)
+  - [Tiếng Việt: Thiết lập môi trường Fedora cho máy chủ & Fedora trên WSL2](#tiếng-việt-thiết-lập-môi-trường-fedora-cho-máy-chủ--fedora-trên-wsl2)
 
 ---
 
@@ -1401,3 +1404,256 @@ WSL2 tự động ánh xạ cổng mạng sang Windows:
 - **Xem chỉ số Node Exporter:** Mở trình duyệt trên Windows &rarr; `http://localhost:9100/metrics`.
 - **Truy cập tệp Linux từ File Explorer Windows:** Nhập `\\wsl$` vào thanh địa chỉ của Windows File Explorer.
 - **Tích hợp VS Code:** Cài đặt extension **"WSL"** trong VS Code trên Windows, sau đó gõ lệnh `code .` tại bất kỳ thư mục nào trong WSL2.
+
+
+---
+
+# APPENDIX / PHỤ LỤC: FEDORA GUIDE (HOST & WSL2) / HƯỚNG DẪN DÀNH CHO FEDORA
+
+---
+
+## ENGLISH: FEDORA HOST ENVIRONMENT SETUP & FEDORA ON WSL2
+
+### 1. Fedora Host Environment Setup (Alternative to Arch Linux Part 1)
+If your host machine runs Fedora Linux instead of Arch Linux, use `dnf` to install the complete virtualization stack.
+
+#### a. Install Virtualization & Networking Tools
+```bash
+sudo dnf install -y @virtualization qemu-kvm libvirt virt-install virt-manager virt-viewer dnsmasq iptables-nft
+```
+
+**Explanation:**
+- `@virtualization`: Fedora package group installing core KVM and QEMU hypervisor packages.
+- `qemu-kvm`: KVM kernel module support and QEMU architecture emulator.
+- `libvirt`: Management daemon and toolset for virtual machines and networks.
+- `virt-install`: Command-line tool to provision VMs (used in Part 2).
+- `virt-manager`: Desktop GUI client for inspecting guest VMs.
+- `dnsmasq` & `iptables-nft`: DHCP/DNS services and NAT translation for virtual networks.
+
+#### b. Grant User Permissions
+```bash
+sudo usermod -aG libvirt,kvm $USER
+newgrp libvirt
+```
+
+#### c. Enable and Start Libvirt Service
+```bash
+sudo systemctl enable --now libvirtd
+```
+
+#### d. Configure Default Virtual Network
+```bash
+sudo firewall-cmd --reload
+sudo virsh net-autostart default
+sudo virsh net-start default
+sudo virsh net-list --all
+```
+
+---
+
+### 2. Running Fedora on Windows WSL2
+Fedora can also be run inside Windows WSL2 for practicing Linux commands and DNF package management.
+
+#### a. Installing Fedora on WSL2
+- **Option 1 — Via Microsoft Store:**
+  Search for **"Fedora Remix for WSL"** in the Microsoft Store and click **Install**.
+
+- **Option 2 — Manual import using official Fedora Container rootfs (Free):**
+  Open PowerShell as Administrator:
+  ```powershell
+  # 1. Download official Fedora rootfs tarball
+  curl -Lo fedora.tar.xz https://download.fedoraproject.org/pub/fedora/linux/releases/40/Container/x86_64/images/Fedora-Container-Base-Generic-40-1.14.x86_64.tar.xz
+
+  # 2. Create destination folder and import into WSL
+  mkdir C:\WSL\Fedora
+  wsl --import Fedora C:\WSL\Fedora fedora.tar.xz --version 2
+
+  # 3. Launch Fedora
+  wsl -d Fedora
+  ```
+
+#### b. Update Packages & Install Basic Development Tools
+```bash
+sudo dnf update -y
+sudo dnf install -y @development-tools curl wget git htop net-tools bind-utils jq
+```
+
+#### c. Enable systemd in Fedora WSL
+Edit `/etc/wsl.conf`:
+```bash
+sudo nano /etc/wsl.conf
+```
+Add:
+```ini
+[boot]
+systemd=true
+```
+In Windows PowerShell, restart WSL:
+```powershell
+wsl --shutdown
+```
+
+---
+
+### 3. Installing Monitoring Stack on Fedora (Prometheus & Grafana via DNF)
+
+#### a. Install Prometheus and Node Exporter
+Fedora provides Node Exporter in its official repositories:
+```bash
+sudo dnf install -y node_exporter
+sudo systemctl enable --now node_exporter
+```
+
+For the Prometheus server:
+```bash
+wget https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz
+tar -xvf prometheus-2.51.2.linux-amd64.tar.gz
+cd prometheus-2.51.2.linux-amd64
+./prometheus --config.file=prometheus.yml
+```
+
+#### b. Install Grafana via Official RPM Repository on Fedora
+```bash
+sudo tee /etc/yum.repos.d/grafana.repo << 'EOF'
+[grafana]
+name=grafana
+baseurl=https://rpm.grafana.com
+repo_gpgcheck=1
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.grafana.com/gpg.key
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+EOF
+
+sudo dnf install -y grafana
+sudo systemctl enable --now grafana-server
+```
+
+#### c. Verify in Web Browser
+- **Grafana UI:** `http://localhost:3000` (default login: `admin`/`admin`)
+- **Node Exporter:** `http://localhost:9100/metrics`
+
+---
+
+## TIẾNG VIỆT: THIẾT LẬP MÔI TRƯỜNG FEDORA CHO MÁY CHỦ & FEDORA TRÊN WSL2
+
+### 1. Thiết lập máy chủ môi trường Fedora (Phương án thay thế cho Arch Linux ở Phần 1)
+Nếu máy chủ của bạn chạy hệ điều hành Fedora Linux thay vì Arch Linux, hãy sử dụng trình quản lý gói DNF để cài đặt toàn bộ ngăn xếp ảo hóa.
+
+#### a. Cài đặt các công cụ ảo hóa & mạng
+```bash
+sudo dnf install -y @virtualization qemu-kvm libvirt virt-install virt-manager virt-viewer dnsmasq iptables-nft
+```
+
+**Giải thích:**
+- `@virtualization`: Nhóm gói của Fedora cài đặt toàn bộ các thành phần lõi KVM và hypervisor QEMU.
+- `qemu-kvm`: Hỗ trợ module hạt nhân KVM và trình giả lập phần cứng QEMU.
+- `libvirt`: Tiến trình daemon và bộ công cụ quản lý các máy ảo và mạng ảo.
+- `virt-install`: Tiện ích dòng lệnh để khởi tạo máy ảo tự động (sử dụng ở Phần 2).
+- `virt-manager`: Giao diện đồ họa máy tính để theo dõi màn hình máy ảo khách.
+- `dnsmasq` & `iptables-nft`: Dịch vụ cấp phát IP DHCP/DNS và chuyển đổi địa chỉ mạng NAT.
+
+#### b. Cấp quyền người dùng cho Libvirt & KVM
+```bash
+sudo usermod -aG libvirt,kvm $USER
+newgrp libvirt
+```
+
+#### c. Kích hoạt và khởi chạy dịch vụ Libvirt
+```bash
+sudo systemctl enable --now libvirtd
+```
+
+#### d. Cấu hình mạng ảo mặc định
+```bash
+sudo firewall-cmd --reload
+sudo virsh net-autostart default
+sudo virsh net-start default
+sudo virsh net-list --all
+```
+
+---
+
+### 2. Cài đặt và sử dụng Fedora trên Windows WSL2
+Bạn hoàn toàn có thể chạy Fedora bên trong Windows WSL2 để thực hành các câu lệnh Linux và trình quản lý gói DNF.
+
+#### a. Cài đặt Fedora trên WSL2
+- **Cách 1 — Qua Microsoft Store:**
+  Tìm kiếm **"Fedora Remix for WSL"** trên Microsoft Store và nhấn **Cài đặt (Install)**.
+
+- **Cách 2 — Nhập thủ công bằng image vùng chứa chính thức của Fedora (Miễn phí):**
+  Mở Windows PowerShell (Chạy với quyền Quản trị viên - Run as Administrator):
+  ```powershell
+  # 1. Tải tệp rootfs nén của Fedora
+  curl -Lo fedora.tar.xz https://download.fedoraproject.org/pub/fedora/linux/releases/40/Container/x86_64/images/Fedora-Container-Base-Generic-40-1.14.x86_64.tar.xz
+
+  # 2. Tạo thư mục lưu trữ và nhập vào WSL
+  mkdir C:\WSL\Fedora
+  wsl --import Fedora C:\WSL\Fedora fedora.tar.xz --version 2
+
+  # 3. Khởi động Fedora
+  wsl -d Fedora
+  ```
+
+#### b. Cập nhật hệ thống & cài đặt các công cụ phát triển cơ bản
+```bash
+sudo dnf update -y
+sudo dnf install -y @development-tools curl wget git htop net-tools bind-utils jq
+```
+
+#### c. Bật systemd trong Fedora WSL
+Chỉnh sửa tệp `/etc/wsl.conf`:
+```bash
+sudo nano /etc/wsl.conf
+```
+Thêm nội dung:
+```ini
+[boot]
+systemd=true
+```
+Trong Windows PowerShell, khởi động lại WSL:
+```powershell
+wsl --shutdown
+```
+
+---
+
+### 3. Cài đặt ngăn xếp giám sát trên Fedora (Prometheus & Grafana qua DNF)
+
+#### a. Cài đặt Prometheus và Node Exporter
+Fedora hỗ trợ gói Node Exporter trực tiếp trong kho lưu trữ chính thức:
+```bash
+sudo dnf install -y node_exporter
+sudo systemctl enable --now node_exporter
+```
+
+Đối với máy chủ Prometheus:
+```bash
+wget https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz
+tar -xvf prometheus-2.51.2.linux-amd64.tar.gz
+cd prometheus-2.51.2.linux-amd64
+./prometheus --config.file=prometheus.yml
+```
+
+#### b. Cài đặt Grafana qua kho RPM chính thức trên Fedora
+```bash
+sudo tee /etc/yum.repos.d/grafana.repo << 'EOF'
+[grafana]
+name=grafana
+baseurl=https://rpm.grafana.com
+repo_gpgcheck=1
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.grafana.com/gpg.key
+sslverify=1
+sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+EOF
+
+sudo dnf install -y grafana
+sudo systemctl enable --now grafana-server
+```
+
+#### c. Kiểm tra trên trình duyệt
+- **Giao diện Grafana:** `http://localhost:3000` (đăng nhập: `admin`/`admin`)
+- **Chỉ số Node Exporter:** `http://localhost:9100/metrics`
