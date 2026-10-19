@@ -1,59 +1,68 @@
-# HƯỚNG DẪN THIẾT LẬP HỆ THỐNG GIÁM SÁT VÀ CẢNH BÁO TỰ ĐỘNG (PROMETHEUS, GRAFANA & ALERTMANAGER)
+# TÀI LIỆU BÁO CÁO HỆ THỐNG GIÁM SÁT VÀ BÁO ĐỘNG TỰ ĐỘNG
+## PROMETHEUS, GRAFANA & ALERTMANAGER FOR LINUX WEB SERVER
 
 ---
 
-## 1. TẠI SAO CẦN DÙNG HỆ THỐNG CẢNH BÁO TỰ ĐỘNG (ALERTING)?
+## PHẦN 1: TỔNG QUAN HỆ THỐNG VÀ LÝ DO LỰA CHỌN
 
-Trong vận hành hệ thống máy chủ Linux Web Server, giám sát (Monitoring) đơn thuần qua các bảng biểu Grafana chỉ giúp ta nhìn thấy trạng thái quá khứ và hiện tại. Tuy nhiên, **không một kỹ sư vận hành nào có thể ngồi nhìn màn hình giám sát 24/7**.
+### 1.1. Đặt vấn đề và Mục tiêu
+Trong quản trị vận hành Web Server (Apache/Nginx), việc chỉ theo dõi trạng thái thủ công hoặc xem biểu đồ thụ động (Monitoring) là chưa đủ. Một hệ thống chuẩn Production đòi hỏi khả năng **Quan sát toàn diện (Observability)** và **Báo động tự động theo thời gian thực (Real-time Alerting)**.
 
-### Các vấn đề khi không có hệ thống Cảnh báo (Alerting):
-1. **Phản ứng bị động:** Chỉ phát hiện sự cố khi người dùng (khách hàng) phàn nàn rằng website bị chậm hoặc sập.
-2. **Lãng phí thời gian:** Kỹ sư phải kiểm tra thủ công từng chỉ số (CPU, RAM, Ổ cứng, SSL, HTTP Status) để tìm lỗi.
-3. **Cảnh báo ảo và ngợp thông báo (Alert Fatigue):** Nếu không có bộ điều phối, khi 1 sự cố nhỏ xảy ra có thể kéo theo hàng trăm email báo lỗi gửi về cùng lúc làm trôi mất thông tin quan trọng.
-
-### Vai trò của Hệ thống Alerting 3 Lớp (Prometheus + Alertmanager + Receiver):
-* **Phát hiện chủ động (Proactive Detection):** Hệ thống tự động đánh giá chỉ số theo chu kỳ (mỗi 5s/15s) và phát hiện bất thường ngay khi nó mới chớm xuất hiện.
-* **Xử lý thông minh (Filtering & Grouping):** Alertmanager giúp gom các cảnh báo liên quan thành 1 thông báo duy nhất, ngắt cảnh báo khi bảo trì (Silencing), và gửi tới đúng kênh liên lạc (Telegram, Email, Slack).
-* **Thông báo thời gian thực (Real-time Notification):** Gửi báo động trực tiếp về điện thoại/máy tính của đội ngũ vận hành qua Telegram Bot ngay trong vòng vài giây.
+**Mục tiêu hệ thống:**
+* Thu thập liên tục các chỉ số phần cứng (CPU, RAM, Disk, Network) và dịch vụ Web từ bên ngoài.
+* Trực quan hóa dữ liệu theo thời gian thực trên Bảng điều khiển (Grafana Dashboard).
+* Tự động phát hiện bất thường và gửi thông báo tức thì đến người quản trị qua Telegram Bot kèm thông tin chi tiết và mốc thời gian chính xác.
 
 ---
 
-## 2. LỘ TRÌNH ĐÀO TẠO TỔNG QUAN: PROMETHEUS & GRAFANA
+### 1.2. Kiến trúc Alerting 3 Lớp (3-tier Alerting Architecture)
 
 ```text
-PHẦN I: PROMETHEUS NỀN TẢNG & KHUÔN KHỔ THU THẬP DỮ LIỆU
-  ├── Chuyên đề (01): Install Prometheus (Kiến trúc TSDB, Service Systemd)
-  ├── Chuyên đề (02): Enable Auth and HTTPS (Bảo mật Web UI bằng TLS & Basic Auth)
-  ├── Chuyên đề (03): Add Monitoring Target (Thu thập chỉ số phần cứng qua Node Exporter)
-  └── Chuyên đề (04): Add Monitoring Target Win (Mở rộng thu thập chỉ số máy chủ Windows)
+[ LỚP 1: DETECTION ]            [ LỚP 2: ROUTING ]            [ LỚP 3: NOTIFICATION ]
+┌────────────────────┐          ┌──────────────────┐          ┌──────────────────────┐
+│  Prometheus Server │ ───────► │   Alertmanager   │ ───────► │    Telegram Bot      │
+│ (Đánh giá Rules)   │ (Firing) │ (Gom cụm, Filter)│(Webhook) │ (Báo động Real-time) │
+└────────────────────┘          └──────────────────┘          └──────────────────────┘
+```
 
-PHẦN II: GIÁM SÁT TỪ BÊN NGOÀI & HỆ THỐNG CẢNH BÁO
-  ├── Chuyên đề (05): Set Alert Notification (Cài đặt Alertmanager & Tích hợp Telegram Bot)
-  └── Chuyên đề (07): Set Blackbox Exporter (Giám sát HTTP Status, SSL Expiry, Ping)
+1. **Lớp 1 - Prometheus (Detection Layer):** Định kỳ đánh giá các biểu thức PromQL. Nếu giá trị vượt ngưỡng và duy trì qua thời gian đệm `for`, Prometheus chuyển trạng thái cảnh báo sang `FIRING` và đẩy dữ liệu sang Alertmanager.
+2. **Lớp 2 - Alertmanager (Routing & Processing Layer):**
+   * **Grouping (Gom cụm):** Nhóm các cảnh báo cùng loại/cùng máy chủ để tránh "bão thông báo" (Alert Fatigue).
+   * **Deduplication (Khử trùng lặp):** Tránh gửi lặp lại cùng một nội dung lỗi liên tục.
+   * **Silencing (Tắt tạm thời):** Cho phép tạm ngắt cảnh báo trong khung giờ bảo trì hệ thống.
+3. **Lớp 3 - Telegram Bot (Notification Layer):** Kênh liên lạc tức thì gửi tin nhắn cảnh báo dạng HTML trực tiếp tới điện thoại/máy tính của quản trị viên.
 
-PHẦN III: TRỰC QUAN HÓA VỚI GRAFANA
-  └── Chuyên đề (06): Visualize on Grafana (Import Dashboard Node Exporter 1860 & Blackbox 7587)
+---
+
+## PHẦN 2: NGUYÊN NHÂN VÀ CÁCH KHẮC PHỤC LỖI THỰC TẾ
+
+### 2.1. Lỗi hiển thị rỗng biến `Thời gian` trên Telegram
+* **Nguyên nhân:** Gọi biến thời gian ngoài phạm vi vòng lặp hoặc sai định dạng chuỗi của Go Template làm Alertmanager không render được chuỗi Timestamp.
+* **Khắc phục:** Sử dụng vòng lặp `{{ range .Alerts }}` để duyệt từng alert đơn lẻ kết hợp hàm định dạng thời gian chuẩn của Go:
+  $$\text{Cú pháp chuẩn: } \texttt{\{\{ .StartsAt.Local.Format "15:04:05 02/01/2006" \}\}}$$
+
+### 2.2. Lỗi Xung đột cổng (Port Conflict) khi triển khai đa máy chủ
+* **Nguyên nhân:** Máy chủ khác có thể đang chạy sẵn các ứng dụng khác chiếm dụng cổng mặc định.
+
+**Danh sách cổng chuẩn và xung đột thường gặp:**
+
+| Dịch vụ | Cổng chuẩn | Dịch vụ dễ gây xung đột | Cách khắc phục |
+| :--- | :---: | :--- | :--- |
+| **Grafana** | `3000` | Node.js, React Dev Server | Đổi `http_port = 3001` trong `/etc/grafana/grafana.ini` |
+| **Prometheus** | `9090` | Cockpit Console, Java Apps | Đổi cờ `--web.listen-address="0.0.0.0:9091"` trong file service |
+| **Alertmanager** | `9093` | Service Mesh/Monitoring cũ | Đổi cờ `--web.listen-address="0.0.0.0:9094"` trong file service |
+| **Node Exporter**| `9100` | Tiến trình giám sát khác | Chặn/Đổi cổng qua UFW hoặc cờ `--web.listen-address` |
+
+**Lệnh kiểm tra xung đột cổng trên Linux:**
+```bash
+sudo ss -tulpn | grep -E '3000|9090|9100|9093'
 ```
 
 ---
 
-## 3. THỰC HÀNH TỪNG BƯỚC: THIẾT LẬP CẢNH BÁO TELEGRAM (DETAILED STEP-BY-STEP)
+## PHẦN 3: HƯỚNG DẪN CẤU HÌNH THỰC HÀNH CHI TIẾT
 
----
-
-### BƯỚC 1: TẠO TELEGRAM BOT VÀ LẤY CHAT ID
-
-1. Mở ứng dụng Telegram, tìm kiếm user **`@BotFather`**.
-2. Gửi lệnh `/newbot` -> Nhập tên Bot -> Nhập Username cho Bot (kết thúc bằng `_bot`).
-3. Sao chép chuỗi **HTTP API Token** được cấp (Ví dụ: `7123456789:AAFxxx...`).
-4. Tìm kiếm Bot bạn vừa tạo, bấm **Start** và gửi một tin nhắn bất kỳ (ví dụ: "Hello").
-5. Tìm kiếm user **`@userinfobot`**, bấm **Start** để lấy chuỗi **Id** tài khoản cá nhân của bạn (Ví dụ: `123456789`).
-
----
-
-### BƯỚC 2: CÀI ĐẶT VÀ CẤU HÌNH ALERTMANAGER
-
-#### 1. Tạo User hệ thống và Thư mục lưu trữ:
+#### Bước 1. Tạo User hệ thống và Thư mục lưu trữ:
 ```bash
 sudo useradd --no-create-home --shell /bin/false alertmanager
 sudo mkdir /etc/alertmanager
@@ -61,7 +70,7 @@ sudo mkdir /var/lib/alertmanager
 ```
 * **Giải thích:** Tạo tài khoản dịch vụ không có quyền truy cập terminal (`/bin/false`) để đảm bảo an toàn bảo mật cho máy chủ Linux.
 
-#### 2. Tải và Cài đặt Binary Alertmanager:
+#### Bước 2. Tải và Cài đặt Binary Alertmanager:
 ```bash
 cd /tmp
 wget https://github.com/prometheus/alertmanager/releases/download/v0.27.0/alertmanager-0.27.0.linux-amd64.tar.gz
@@ -72,93 +81,94 @@ sudo mv alertmanager /usr/local/bin/
 sudo mv amtool /usr/local/bin/
 ```
 
-#### 3. Cấu hình Alertmanager gửi tin nhắn về Telegram (`/etc/alertmanager/alertmanager.yml`):
+
+### Bước 3: Cấu hình Alertmanager kết nối Telegram (`/etc/alertmanager/alertmanager.yml`)
+
 ```bash
 sudo nano /etc/alertmanager/alertmanager.yml
 ```
 
-Dán nội dung cấu hình sau:
 ```yaml
 global:
   resolve_timeout: 5m
 
 route:
   group_by: ['alertname', 'instance', 'severity']
-  group_wait: 5s         # Thời gian chờ gom các cảnh báo xảy ra cùng lúc
+  group_wait: 5s         # Chờ 5s để gom các cảnh báo phát sinh đồng thời
   group_interval: 10s    # Cập nhật thông báo sau mỗi 10s
-  repeat_interval: 2h    # Lặp lại thông báo sau 2 tiếng nếu chưa khắc phục
+  repeat_interval: 2h    # Lặp lại thông báo sau 2h nếu chưa sửa lỗi
   receiver: 'telegram-bot'
 
 receivers:
   - name: 'telegram-bot'
     telegram_configs:
-      - bot_token: '7123456789:AAFxxx...'  # Thay bằng Token từ BotFather
-        chat_id: 123456789                  # Thay bằng Chat ID từ userinfobot
+      - bot_token: 'YOUR_BOT_TOKEN'  # Thay Token Bot Telegram của bạn
+        chat_id: YOUR_CHAT_ID        # Thay Chat ID của bạn
         parse_mode: 'HTML'
         message: |
-          <b>{{ if eq .Status "firing" }}🔥 CANH BÁO SỰ CỐ {{ else }}✅ SỰ CỐ ĐÃ KHẮC PHỤC {{ end }}</b>
+          {{ range .Alerts }}
+          <b>{{ if eq .Status "firing" }}🔥 CANH BÁO SỰ CỐ{{ else }}✅ SỰ CỐ ĐÃ KHẮC PHỤC{{ end }}</b>
 
-          <b>Cảnh báo:</b> {{ .CommonAnnotations.summary }}
-          <b>Mức độ:</b> <code>{{ .CommonLabels.severity }}</code>
-          <b>Đối tượng:</b> <code>{{ .CommonLabels.instance }}</code>
+          <b>Cảnh báo:</b> {{ .Annotations.summary }}
+          <b>Mức độ:</b> <code>{{ .Labels.severity }}</code>
+          <b>Đối tượng:</b> <code>{{ .Labels.instance }}</code>
 
-          <b>Chi tiết:</b> {{ .CommonAnnotations.description }}
-          <b>Thời gian:</b> {{ .StartsAt.Format "15:04:05 02/01/2006" }}
+          <b>Chi tiết:</b> {{ .Annotations.description }}
+          <b>Thời gian:</b> <code>{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}</code>
+          {{ end }}
 ```
 
-#### 4. Phân quyền và Tạo Systemd Service:
+**Kiểm tra cú pháp và Restart dịch vụ:**
 ```bash
-sudo chown -R alertmanager:alertmanager /etc/alertmanager /var/lib/alertmanager
-sudo chown alertmanager:alertmanager /usr/local/bin/alertmanager /usr/local/bin/amtool
-```
-
-Tạo file dịch vụ Systemd:
-```bash
-sudo nano /etc/systemd/system/alertmanager.service
-```
-
-Dán nội dung:
-```ini
-[Unit]
-Description=Alertmanager for Prometheus
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=alertmanager
-Group=alertmanager
-Type=simple
-ExecStart=/usr/local/bin/alertmanager \
-    --config.file=/etc/alertmanager/alertmanager.yml \
-    --storage.path=/var/lib/alertmanager/
-
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Khởi chạy dịch vụ Alertmanager:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl start alertmanager
-sudo systemctl enable alertmanager
+amtool check-config /etc/alertmanager/alertmanager.yml
+sudo systemctl restart alertmanager
 ```
 
 ---
 
-### BƯỚC 3: THIẾT LẬP THỜI GIAN QUÉT VÀ QUY TẮC CẢNH BÁO (ALERT RULES)
+### Bước 4: Thiết lập Quy tắc Cảnh báo (`/etc/prometheus/alert_rules.yml`)
 
-#### 1. Cập nhật chu kỳ quét trong `prometheus.yml` để Demo đáp ứng tức thì:
+```bash
+sudo nano /etc/prometheus/alert_rules.yml
+```
+
+```yaml
+groups:
+  - name: WebServerInfrastructureAlerts
+    rules:
+      # Quy tắc 1: Máy chủ hoặc Dịch vụ ngắt kết nối
+      - alert: ServiceDown
+        expr: up == 0
+        for: 5s
+        labels:
+          severity: CRITICAL
+        annotations:
+          summary: "Dịch vụ {{ $labels.job }} ngắt kết nối!"
+          description: "Target {{ $labels.instance }} trên máy chủ đã ngừng hoạt động."
+
+      # Quy tắc 2: Tải RAM cao bất thường (> 80%)
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 80
+        for: 5s
+        labels:
+          severity: WARNING
+        annotations:
+          summary: "Cảnh báo dung lượng RAM!"
+          description: "Mức sử dụng RAM hiện tại là {{ $value | printf \"%.2f\" }}% (vượt ngưỡng 80%)."
+```
+
+---
+
+### Bước 5: Cấu hình Prometheus Server (`/etc/prometheus/prometheus.yml`)
+
 ```bash
 sudo nano /etc/prometheus/prometheus.yml
 ```
 
-Cập nhật 2 thông số ở đầu file:
 ```yaml
 global:
-  scrape_interval: 5s       # Thu thập dữ liệu mỗi 5 giây
-  evaluation_interval: 5s   # Đánh giá luật cảnh báo mỗi 5 giây
+  scrape_interval: 5s       # Tần suất quét số liệu (5s cho demo)
+  evaluation_interval: 5s  # Tần suất đánh giá quy tắc cảnh báo (5s cho demo)
 
 alerting:
   alertmanagers:
@@ -168,106 +178,127 @@ alerting:
 
 rule_files:
   - '/etc/prometheus/alert_rules.yml'
-```
-* **Tại sao làm vậy?** Mặc định `evaluation_interval` là `1m` (60 giây), khiến việc đếm ngược PENDING chuyển sang FIRING bị trễ. Đặt `5s` giúp hệ thống phản ứng ngay lập tức khi chạy Demo.
 
-#### 2. Tạo file quy tắc cảnh báo `/etc/prometheus/alert_rules.yml`:
+scrape_configs:
+  - job_name: "prometheus"
+    scrape_interval: 5s
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    basic_auth:
+      username: "admin"
+      password: "YOUR_PASSWORD"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node_exporter"
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["localhost:9100"]
+```
+
+**Kiểm tra cú pháp và Nạp lại cấu hình:**
 ```bash
-sudo nano /etc/prometheus/alert_rules.yml
-```
-
-Dán nội dung các quy tắc chuẩn xác sau:
-```yaml
-groups:
-  - name: WebServerInfrastructureAlerts
-    rules:
-      # Kịch bản 1: Máy chủ/Dịch vụ bị sập
-      - alert: ServiceDown
-        expr: up == 0
-        for: 5s
-        labels:
-          severity: CRITICAL
-        annotations:
-          summary: "Dịch vụ {{ $labels.job }} ngắt kết nối!"
-          description: "Target {{ $labels.instance }} đã không thể kết nối."
-
-      # Kịch bản 2: Tải RAM vượt ngưỡng 70%
-      - alert: HighMemoryUsage
-        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 70
-        for: 5s
-        labels:
-          severity: WARNING
-        annotations:
-          summary: "Cảnh báo dung lượng RAM vượt ngưỡng 70%!"
-          description: "Mức sử dụng RAM hiện tại là {{ $value | printf \"%.2f\" }}%."
-```
-
-#### 3. Phân quyền, Kiểm tra cú pháp và Khởi động lại Prometheus:
-```bash
-sudo chown prometheus:prometheus /etc/prometheus/alert_rules.yml
-
-# Kiểm tra cú pháp bằng promtool
 promtool check config /etc/prometheus/prometheus.yml
-promtool check rules /etc/prometheus/alert_rules.yml
-
-# Khởi động lại dịch vụ
 sudo systemctl restart prometheus
 ```
 
 ---
 
-## 4. KỊCH BẢN THỰC HÀNH DEMO SỰ CỐ (XÁC MINH HOẠT ĐỘNG)
+## PHẦN 4: SCRIPT TỰ ĐỘNG HÓA KIỂM THỬ (AUTO-STRESS DEMO)
 
-### KỊCH BẢN 1: DEMO MÁY CHỦ SẬP (SERVICE DOWN)
+Script Python tự động đo dung lượng RAM thực tế và ép tải chính xác theo tỉ lệ % mong muốn trong **180 giây** mà không làm sập hệ thống (OOM).
 
-1. **Thực thi lệnh tắt dịch vụ Node Exporter:**
-   ```bash
-   sudo systemctl stop node_exporter
-   ```
-2. **Diễn biến:**
-   * Mở giao diện Prometheus UI (`https://<IP>:9090/alerts`).
-   * Sau **1 - 5 giây**: Rule `ServiceDown` chuyển sang màu vàng **`PENDING`**.
-   * Sau **5 giây tiếp theo** (do `for: 5s`): Rule chuyển sang màu đỏ **`FIRING`**.
-   * Telegram báo chuông tin nhắn: **🔥 CANH BÁO SỰ CỐ** - Dịch vụ node_exporter ngắt kết nối.
-3. **Phục hồi sự cố:**
-   ```bash
-   sudo systemctl start node_exporter
-   ```
-   * Telegram gửi tiếp tin nhắn: **✅ SỰ CỐ ĐÃ KHẮC PHỤC**.
-
----
-
-### KỊCH BẢN 2: DEMO GIẢ LẬP QUÁ TẢI RAM (RESOURCE STRESS TEST)
-
-#### 1. Kiểm tra % RAM thực tế hiện tại:
-Truy cập Prometheus UI (`https://<IP>:9090/graph`), gõ câu lệnh PromQL:
-```promql
-(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
-```
-*(Nếu kết quả hiển thị ~69%, ta cần ép RAM tăng thêm khoảng 800MB - 1000MB để vượt mốc 70%)*.
-
-#### 2. Thực thi lệnh ép tải RAM chuẩn xác:
-Sử dụng công cụ `stress` cấp phát **1000MB (1GB)** trên **1 tiến trình đơn (`--vm 1`)** để tránh bị tính năng OOM Killer của Linux can thiệp:
 ```bash
-stress --vm 1 --vm-bytes 1000M --timeout 90s
+sudo apt update && sudo apt install -y python3-psutil stress
+nano auto_stress.py
 ```
 
-#### 3. Diễn biến quan sát:
-* Trong lúc lệnh `stress` đang chạy, quay lại Web UI bấm **Execute** lại câu lệnh PromQL, bạn sẽ thấy con số nhảy vọt lên **~85%**.
-* Vào tab **Alerts (`https://<IP>:9090/alerts`)**:
-  * **0 - 5 giây:** Rule `HighMemoryUsage` chuyển màu vàng **`PENDING`**.
-  * **Sau 5 giây:** Rule chuyển màu đỏ rực **`FIRING`**.
-* Telegram nổ thông báo: **🔥 CANH BÁO SỰ CỐ** - Mức sử dụng RAM hiện tại là `85.24%`.
-* Hết **90 giây**, lệnh `stress` kết thúc, RAM giải phóng về mức bình thường, Telegram gửi tin nhắn **✅ SỰ CỐ ĐÃ KHẮC PHỤC**.
+```python
+#!/usr/bin/env python3
+import sys
+import subprocess
+import psutil
+
+def auto_stress(target_percent, duration=180):
+    mem = psutil.virtual_memory()
+    total_mb = mem.total / (1024 * 1024)
+    used_mb = mem.used / (1024 * 1024)
+    current_percent = mem.percent
+
+    print(f"=== BÁO CÁO TRẠNG THÁI RAM BAN ĐẦU ===")
+    print(f"Tổng RAM hệ thống : {total_mb:.2f} MB")
+    print(f"RAM đang sử dụng   : {used_mb:.2f} MB ({current_percent:.2f}%)")
+    print(f"Mức % RAM mục tiêu : {target_percent}%")
+
+    if target_percent <= current_percent:
+        print(f"[!] RAM hiện tại ({current_percent:.2f}%) đã >= mục tiêu ({target_percent}%). Không cần ép tải.")
+        return
+
+    target_used_mb = total_mb * (target_percent / 100.0)
+    needed_mb = int(target_used_mb - used_mb)
+
+    print(f"\n[+] Tính toán: Cần ép thêm khoảng {needed_mb} MB RAM trong {duration} giây.")
+
+    cmd = ["stress", "--vm", "1", "--vm-bytes", f"{needed_mb}M", "--timeout", f"{duration}s"]
+    print(f"[+] Đang chạy lệnh: {' '.join(cmd)}\n")
+    
+    try:
+        subprocess.run(cmd, check=True)
+    except KeyboardInterrupt:
+        print("\n[*] Đã chủ động dừng kiểm thử.")
+    except Exception as e:
+        print(f"[!] Lỗi khi thực thi stress: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Cách dùng: python3 auto_stress.py <Phần_Trăm_RAM_Mục_Tiêu> [Thời_Gian_Giây]")
+        print("Ví dụ:     python3 auto_stress.py 85 180")
+        sys.exit(1)
+
+    target_pct = float(sys.argv[1])
+    dur = int(sys.argv[2]) if len(sys.argv) > 2 else 180
+    auto_stress(target_pct, dur)
+```
 
 ---
 
-## 5. LƯU Ý KHI VẬN HÀNH ALERTS
+## PHẦN 5: KỊCH BẢN 1 ROUND BÁO CÁO THỰC TẾ (DEMO SỰ CỐ 180S)
 
-1. **Luôn kiểm tra dung lượng còn lại trước khi chạy Stress:** Dùng lệnh `free -m` để xem cột `available`. Không đặt thông số `--vm-bytes` vượt quá lượng RAM `available` hiện có để tránh làm sập tiến trình.
-2. **Mẹo Nạp lại cấu hình nhanh (Zero-downtime Reload):**
-   Thay vì restart toàn bộ service, bạn có thể gửi phương thức POST đến API của Prometheus:
+1. **Chạy kịch bản ép tải RAM 85% trong 180s:**
    ```bash
-   curl -k -u admin:MatKhauCuaBan -X POST https://localhost:9090/-/reload
+   python3 auto_stress.py 85 180
    ```
-3. **Mẹo tạo "Silence" khi bảo trì máy chủ:** Trên giao diện Alertmanager (`http://<IP>:9093`), bạn bấm vào nút **New Silence** để tạo bộ lọc tắt cảnh báo tạm thời cho một IP hoặc Tên miền cụ thể trong khoảng thời gian bảo trì, tránh gửi tin nhắn rác về Telegram.
+2. **Giai đoạn PENDING (0s - 5s):**
+   * RAM nhảy vọt lên ~85%.
+   * Prometheus UI (`https://<IP>:9090/alerts`) chuyển rule `HighMemoryUsage` sang **`PENDING`** màu vàng.
+3. **Giai đoạn FIRING & Báo Telegram (5s - 10s):**
+   * Rule chuyển sang **`FIRING`** màu đỏ.
+   * Telegram nhận tin nhắn báo động:
+
+   > **🔥 CANH BÁO SỰ CỐ**  
+   > **Cảnh báo:** Cảnh báo dung lượng RAM!  
+   > **Mức độ:** `WARNING`  
+   > **Đối tượng:** `localhost:9100`  
+   > **Chi tiết:** Mức sử dụng RAM hiện tại là 85.12% (vượt ngưỡng 80%).  
+   > **Thời gian:** `10:08:15 19/10/2026`
+
+4. **Giai đoạn Tự động Phục hồi - RESOLVED (Sau 180s):**
+   * Hết 180s, lệnh `stress` kết thúc, RAM hạ về mức bình thường (~60%).
+   * Telegram nhận tin nhắn phục hồi:
+
+   > **✅ SỰ CỐ ĐÃ KHẮC PHỤC**  
+   > **Cảnh báo:** Cảnh báo dung lượng RAM!  
+   > **Mức độ:** `WARNING`  
+   > **Đối tượng:** `localhost:9100`  
+   > **Chi tiết:** Mức sử dụng RAM hiện tại là 60.15% (vượt ngưỡng 80%).  
+   > **Thời gian:** `10:11:15 19/10/2026`
+
+---
+
+## PHẦN 6: KẾT LUẬN
+
+Hệ thống giám sát và báo động tự động (**Prometheus, Grafana, Alertmanager, Telegram Bot**) đáp ứng trọn vẹn tiêu chí chuẩn Production:
+1. **Quan sát toàn diện (Observability):** Giám sát đầy đủ cả hạ tầng nội tại và dịch vụ bên ngoài.
+2. **Tức thì & Chính xác (Real-time & Accuracy):** Cảnh báo phát sinh sau vài giây, mốc thời gian hiển thị chính xác tới từng giây.
+3. **Tự động hóa hoàn toàn (Automation):** Tự động tính toán ép tải thử nghiệm và tự động thông báo khi hệ thống phục hồi.
