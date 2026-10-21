@@ -24,6 +24,9 @@ This document contains all the commands recommended for setting up the environme
 - [APPENDIX / PHỤ LỤC: FEDORA GUIDE (HOST & WSL2)](#appendix--phụ-lục-fedora-guide-host--wsl2--hướng-dẫn-dành-cho-fedora)
   - [English: Fedora Host Environment Setup & Fedora on WSL2](#english-fedora-host-environment-setup--fedora-on-wsl2)
   - [Tiếng Việt: Thiết lập môi trường Fedora cho máy chủ & Fedora trên WSL2](#tiếng-việt-thiết-lập-môi-trường-fedora-cho-máy-chủ--fedora-trên-wsl2)
+- [APPENDIX / PHỤ LỤC: PRODUCTION LEVEL ALERTING](#appendix--phụ-lục-production-level-alerting)
+  - [English: Production Level Alerting Architecture & Practice](#english-production-level-alerting-architecture--practice)
+  - [Tiếng Việt: Kiến trúc và Thực hành Cảnh báo Chuẩn Production](#tiếng-việt-kiến-trúc-và-thực-hành-cảnh-báo-chuẩn-production)
 
 ---
 
@@ -1657,3 +1660,456 @@ sudo systemctl enable --now grafana-server
 #### c. Kiểm tra trên trình duyệt
 - **Giao diện Grafana:** `http://localhost:3000` (đăng nhập: `admin`/`admin`)
 - **Chỉ số Node Exporter:** `http://localhost:9100/metrics`
+---
+
+# APPENDIX / PHỤ LỤC: PRODUCTION LEVEL ALERTING
+
+## ENGLISH: PRODUCTION LEVEL ALERTING ARCHITECTURE & PRACTICE
+
+### 1. The Need for Production-Level Alerting (Alert Fatigue & Golden Signals)
+Basic alerting setups send uncoordinated emails or chats whenever any single threshold is breached. In real-world enterprise environments, this approach quickly creates severe operational failures:
+* **Alert Fatigue (Spam):** When an incident occurs (such as a server crash), dozens of dependent alerts fire simultaneously (CPU metrics lost, RAM metrics missing, Web service down, DB timeout). Engineers become overwhelmed and begin to ignore notifications.
+* **Context Loss:** When dozens of alerts fire at once, operators cannot distinguish between the **Root Cause** (e.g. host down) and secondary **Symptoms** (e.g. high latency).
+* **The 4 Pillars of Production Alerting:**
+  1. **Grouping (`group_by`):** Aggregating related alerts into a single cohesive notification rather than firing individual messages for every single alert.
+  2. **Inhibition (`inhibit_rules`):** Automatically silencing secondary, dependent warnings when a critical root-cause alert is already firing (e.g. silencing `HighCPUUsage` when `NodeExporterDown` is active).
+  3. **Golden Signals Standardization:** Defining alert rules around Google SRE Golden Signals (Latency, Traffic, Errors, Saturation) with structured metadata (`severity`, `team`, `tier`, `runbook_url`).
+  4. **Smart Routing & On-Call Escalation:** Routing warnings to team chat channels (Slack, Telegram) while critical incidents trigger on-call escalations (PagerDuty, Opsgenie).
+
+---
+
+### 2. The 3-Tier Alerting Architecture
+```text
+[ TIER 1: DETECTION ]            [ TIER 2: ROUTING & PROCESSING ]       [ TIER 3: NOTIFICATION ]
+┌─────────────────────────┐       ┌───────────────────────────────┐      ┌─────────────────────────┐
+│    Prometheus Server    │       │         Alertmanager          │      │     Telegram Bot        │
+│                         │       │                               │      │   (Real-time Chat)      │
+│ • Periodic PromQL eval  │──────►│ • Grouping (group_by)         │─────►├─────────────────────────┤
+│ • Threshold buffer (for)│(Firing│ • Deduplication               │      │    PagerDuty / Slack    │
+│ • States:               │)      │ • Inhibition (inhibit_rules)  │      │     (On-Call Escalation)│
+│   Pending -> Firing     │       │ • Silencing (Maintenance)     │      │                         │
+└─────────────────────────┘       └───────────────────────────────┘      └─────────────────────────┘
+```
+1. **Tier 1 - Detection (Prometheus):** Prometheus evaluates PromQL expressions every `evaluation_interval`. When an expression remains true for the duration specified by `for`, the alert transitions from `PENDING` to `FIRING` and is dispatched to Alertmanager.
+2. **Tier 2 - Routing & Processing (Alertmanager):** Alertmanager acts as the central intelligence hub. It deduplicates alerts, waits for grouping windows (`group_wait`), filters out alerts suppressed by `inhibit_rules` or silences, and routes valid notifications to configured receivers.
+3. **Tier 3 - Notification (Telegram / Slack / PagerDuty):** Transmits rich HTML/Markdown messages with timestamps, severity levels, detailed descriptions, and runbook links to engineering teams.
+
+---
+
+### 3. Port Allocation & Conflict Prevention
+In complex monitoring setups, port collisions are frequent causes of startup failure.
+
+| Service | Default Port | Common Conflicting Software | Resolution Strategy |
+| :--- | :---: | :--- | :--- |
+| **Grafana** | `3000` | Node.js dev server, React apps, Ruby on Rails | Set `http_port = 3001` in `/etc/grafana/grafana.ini` |
+| **Prometheus** | `9090` | Cockpit Web Console, Java microservices | Set `--web.listen-address="0.0.0.0:9091"` in systemd unit |
+| **Alertmanager** | `9093` | Previous Alertmanager instances, mesh proxies | Set `--web.listen-address="0.0.0.0:9094"` in systemd unit |
+| **Node Exporter**| `9100` | Other hardware monitoring daemons | Set `--web.listen-address="0.0.0.0:9101"` |
+
+**Verification Command (run on host or VM):**
+```bash
+sudo ss -tulpn | grep -E '3000|9090|9093|9100'
+```
+
+---
+
+### 4. Alertmanager Production Configuration (`alertmanager.yml`)
+Configure `/etc/alertmanager/alertmanager.yml` on `mon-server` with grouping, inhibition, and Telegram notification delivery:
+
+```yaml
+global:
+  resolve_timeout: 5m
+
+templates:
+  - '/etc/alertmanager/alert.tmpl'
+
+route:
+  group_by: ['alertname', 'instance', 'job']
+  group_wait: 10s       # Wait 10s to collect simultaneous alerts
+  group_interval: 1m     # Frequency for sending updates on existing groups
+  repeat_interval: 1h    # Interval before re-sending unchanged firing alerts
+  receiver: 'telegram-receiver'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'telegram-receiver'
+      continue: true
+    - matchers:
+        - severity="critical"
+      receiver: 'incident-webhook'
+
+receivers:
+  - name: 'telegram-receiver'
+    telegram_configs:
+      - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
+        chat_id: YOUR_TELEGRAM_CHAT_ID
+        parse_mode: 'HTML'
+        send_resolved: true
+        message: '{{ template "telegram.html" . }}'
+
+  - name: 'incident-webhook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/alerts'
+        send_resolved: true
+
+# INHIBITION RULES: Mute HighCPUUsage (warning) when NodeExporterDown (critical) is active
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+      - alertname="NodeExporterDown"
+    target_matchers:
+      - severity="warning"
+      - alertname="HighCPUUsage"
+    equal: ['instance', 'job']
+```
+
+---
+
+### 5. Telegram HTML Notification Template & Go Template Timestamp Fix
+Create `/etc/alertmanager/alert.tmpl`:
+
+```gotemplate
+{{ define "telegram.html" }}
+{{ if eq .Status "firing" }}
+<b>🚨 PRODUCTION ALERT: SYSTEM INCIDENT</b>
+{{ else }}
+<b>✅ INCIDENT RECOVERY: RESOLVED</b>
+{{ end }}
+------------------------------------
+{{ range .Alerts }}
+<b>Alert Name:</b> <code>{{ .Labels.alertname }}</code>
+<b>Severity:</b> <code>{{ .Labels.severity | toUpper }}</code>
+<b>Service:</b> {{ .Labels.job }}
+<b>Target:</b> <code>{{ .Labels.instance }}</code>
+<b>Timestamp:</b> <code>{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}</code>
+
+<b>Description:</b> {{ .Annotations.description }}
+{{ if .Annotations.runbook_url }}
+🔗 <a href="{{ .Annotations.runbook_url }}">Runbook Documentation</a>
+{{ end }}
+------------------------------------
+{{ end }}
+{{ end }}
+```
+
+> **Why the Timestamp Bug Occurs:** In Go Template rendering, calling `{{ .StartsAt }}` directly outside of the `{{ range .Alerts }}` loop evaluates to nil because `.StartsAt` is an attribute of individual alerts, not the top-level payload. Furthermore, Go requires the specific reference date format `15:04:05 02/01/2006` to correctly serialize timestamps.
+
+---
+
+### 6. Standardized Alert Rules & Accurate Memory Formula (`alert_rules.yml`)
+Place in `/etc/prometheus/alert_rules.yml`:
+
+```yaml
+groups:
+  - name: production_node_alerts
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "Node Exporter on {{ $labels.instance }} is unreachable"
+          description: "Target {{ $labels.instance }} has been unreachable for more than 30 seconds."
+          runbook_url: "https://wiki.internal.net/ops/runbook/node-down"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "High CPU usage detected on {{ $labels.instance }}"
+          description: "CPU utilization on {{ $labels.instance }} is currently {{ $value | printf \"%.2f\" }}% (> 80%)."
+          runbook_url: "https://wiki.internal.net/ops/runbook/cpu-spike"
+
+      # NOTE: Using MemAvailable instead of MemFree to reflect actual reclaimable memory
+      - alert: HighMemoryUsage
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 80
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "High Memory usage detected on {{ $labels.instance }}"
+          description: "Actual RAM utilization on {{ $labels.instance }} reached {{ $value | printf \"%.2f\" }}% (> 80%)."
+          runbook_url: "https://wiki.internal.net/ops/runbook/high-ram"
+
+      - alert: DiskSpaceLow
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"}) > 85
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: storage
+        annotations:
+          summary: "Root filesystem partition low on disk space on {{ $labels.instance }}"
+          description: "Root partition on {{ $labels.instance }} has exceeded 85% disk utilization."
+          runbook_url: "https://wiki.internal.net/ops/runbook/disk-cleanup"
+```
+
+Verify configurations with Prometheus developer tools:
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+promtool check rules /etc/prometheus/alert_rules.yml
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
+---
+
+### 7. Automated Testing Tools (`auto_stress.py`)
+To test RAM alerting reliably without triggering the Linux Out-Of-Memory (OOM) Killer, use `scripts/auto_stress.py` on `mon-target`:
+
+```bash
+# On mon-target:
+sudo apt update && sudo apt install -y python3-psutil stress
+# Run dynamic RAM stress targeting 85% usage for 180 seconds:
+python3 scripts/auto_stress.py 85 180
+```
+
+---
+
+### 8. End-to-End Live Incident Demos
+
+#### Demo Scenario A: RAM Stress & Alert Lifecycle (Pending -> Firing -> Resolved)
+1. **Trigger Load:** Run `python3 scripts/auto_stress.py 85 180` on `mon-target`.
+2. **Observe PENDING:** Within 5 seconds, open Prometheus UI (`http://<server-ip>:9090/alerts`). `HighMemoryUsage` switches to yellow **`PENDING`**.
+3. **Observe FIRING & Notification:** After 1 minute of sustained load, the rule enters red **`FIRING`**. Alertmanager groups and dispatches the HTML notification to Telegram.
+4. **Observe RECOVERY:** After 180 seconds, `stress` terminates. Memory drops back to normal (~50%). Prometheus detects normal state and Alertmanager issues an automated **`RESOLVED`** notification to Telegram.
+
+#### Demo Scenario B: Alert Inhibition Demonstration
+1. **Generate CPU Stress:** Run `stress-ng --cpu 1 --timeout 300s &` on `mon-target`.
+2. **Wait for HighCPUUsage Warning:** Observe the alert in Alertmanager (`http://<server-ip>:9093`).
+3. **Simulate Host/Agent Crash:** Stop Node Exporter: `sudo systemctl stop prometheus-node-exporter`.
+4. **Verify Inhibition:** Once `NodeExporterDown` enters `FIRING` (Critical), Alertmanager evaluates `inhibit_rules`. `HighCPUUsage` is automatically muted/inhibited. Engineers receive only one notification for the root cause (`NodeExporterDown`).
+
+---
+
+## TIẾNG VIỆT: KIẾN TRÚC VÀ THỰC HÀNH CẢNH BÁO CHUẨN PRODUCTION
+
+### 1. Tại sao cần cảnh báo chuẩn Production (Bão cảnh báo & 4 Tín hiệu vàng)
+Hệ thống cảnh báo cơ bản thường gửi email/chat đơn lẻ mỗi khi một chỉ số vượt ngưỡng. Trong môi trường doanh nghiệp, cách tiếp cận này nhanh chóng dẫn đến sự cố nghiêm trọng:
+* **Bão cảnh báo (Alert Fatigue / Spam):** Khi một sự cố gốc xảy ra (máy chủ mất nguồn), hàng loạt cảnh báo phụ nổ ra cùng lúc (mất CPU, mất RAM, web sập, DB ngắt kết nối). Kỹ sư bị ngợp thông báo và bắt đầu phớt lờ cảnh báo.
+* **Mất ngữ cảnh:** Nhận hàng trăm tin nhắn khiến đội ngũ vận hành không thể phân biệt đâu là **Nguyên nhân gốc (Root Cause)** và đâu là **Triệu chứng phụ (Symptoms)**.
+* **Bốn trụ cột của Production Alerting:**
+  1. **Gom cụm (`group_by`):** Gộp các cảnh báo liên quan vào duy nhất một thông báo tổng hợp.
+  2. **Triệt tiêu (`inhibit_rules`):** Tự động dập tắt cảnh báo phụ khi cảnh báo chính mức nghiêm trọng hơn đã kích hoạt (ví dụ: tắt `HighCPUUsage` khi `NodeExporterDown` đã nổ ra).
+  3. **Chuẩn hóa Golden Signals:** Xây dựng quy tắc theo 4 tín hiệu vàng (Độ trễ, Lưu lượng, Lỗi, Độ bão hòa) kèm metadata chuẩn (`severity`, `team`, `tier`, `runbook_url`).
+  4. **Định tuyến thông minh & On-Call:** Cảnh báo Warning gửi vào nhóm chat (Telegram, Slack); cảnh báo Critical tự động kích hoạt ca trực On-Call (PagerDuty, Opsgenie).
+
+---
+
+### 2. Kiến trúc Cảnh báo 3 Lớp (3-Tier Alerting Architecture)
+```text
+[ LỚP 1: DETECTION ]             [ LỚP 2: ROUTING & PROCESSING ]        [ LỚP 3: NOTIFICATION ]
+┌─────────────────────────┐       ┌───────────────────────────────┐      ┌─────────────────────────┐
+│    Prometheus Server    │       │         Alertmanager          │      │     Telegram Bot        │
+│                         │       │                               │      │   (Nhắn tin Real-time)  │
+│ • Quét định kỳ PromQL   │──────►│ • Gom cụm (group_by)          │─────►├─────────────────────────┤
+│ • Thời gian đệm (for)   │(Firing│ • Lọc trùng lặp (Deduplicate) │      │    PagerDuty / Slack    │
+│ • Trạng thái:           │)      │ • Triệt tiêu (inhibit_rules)  │      │     (Điều phối On-Call) │
+│   Pending -> Firing     │       │ • Tắt tạm thời (Silencing)    │      │                         │
+└─────────────────────────┘       └───────────────────────────────┘      └─────────────────────────┘
+```
+1. **Lớp 1 - Detection (Prometheus):** Chịu trách nhiệm đo đạc và phát hiện. Định kỳ chạy các truy vấn PromQL. Khi biểu thức vượt ngưỡng liên tục trong khoảng thời gian `for`, trạng thái chuyển từ `PENDING` sang `FIRING` và đẩy dữ liệu sang Alertmanager.
+2. **Lớp 2 - Routing & Processing (Alertmanager):** Bộ não xử lý thông báo. Chờ cửa sổ gom cụm (`group_wait`), áp dụng các quy tắc triệt tiêu (`inhibit_rules`) để dập tắt thông báo rác, và điều phối tới đúng đích nhận.
+3. **Lớp 3 - Notification (Telegram / Slack / PagerDuty):** Gửi thông điệp định dạng HTML/Markdown giàu thông tin kèm thời gian, đối tượng, mức độ và liên kết tài liệu khắc phục (Runbook).
+
+---
+
+### 3. Quản lý và xử lý xung đột cổng hệ thống
+Khi triển khai ngăn xếp giám sát, xung đột cổng là lỗi thường gặp nhất.
+
+| Dịch vụ | Cổng chuẩn | Dịch vụ dễ gây xung đột | Giải pháp xử lý |
+| :--- | :---: | :--- | :--- |
+| **Grafana** | `3000` | Node.js dev server, React, Ruby on Rails | Đổi `http_port = 3001` trong `/etc/grafana/grafana.ini` |
+| **Prometheus** | `9090` | Cockpit Web Console, ứng dụng Java | Đổi `--web.listen-address="0.0.0.0:9091"` trong systemd service |
+| **Alertmanager** | `9093` | Alertmanager bản cũ, Envoy/Mesh | Đổi `--web.listen-address="0.0.0.0:9094"` trong systemd service |
+| **Node Exporter**| `9100` | Các daemon thu thập chỉ số khác | Đổi `--web.listen-address="0.0.0.0:9101"` |
+
+**Lệnh kiểm tra tiến trình đang chiếm dụng cổng:**
+```bash
+sudo ss -tulpn | grep -E '3000|9090|9093|9100'
+```
+
+---
+
+### 4. Cấu hình Alertmanager toàn diện (`alertmanager.yml`)
+Mở file `/etc/alertmanager/alertmanager.yml` trên `mon-server`:
+
+```yaml
+global:
+  resolve_timeout: 5m
+
+templates:
+  - '/etc/alertmanager/alert.tmpl'
+
+route:
+  group_by: ['alertname', 'instance', 'job']
+  group_wait: 10s       # Chờ 10s gom các alert đồng thời
+  group_interval: 1m     # Khoảng thời gian cập nhật nhóm cảnh báo
+  repeat_interval: 1h    # Gửi lại cảnh báo nếu sự cố chưa giải quyết
+  receiver: 'telegram-receiver'
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'telegram-receiver'
+      continue: true
+    - matchers:
+        - severity="critical"
+      receiver: 'incident-webhook'
+
+receivers:
+  - name: 'telegram-receiver'
+    telegram_configs:
+      - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
+        chat_id: YOUR_TELEGRAM_CHAT_ID
+        parse_mode: 'HTML'
+        send_resolved: true
+        message: '{{ template "telegram.html" . }}'
+
+  - name: 'incident-webhook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/alerts'
+        send_resolved: true
+
+# QUY TẮC TRIỆT TIÊU: Ẩn HighCPUUsage (warning) khi NodeExporterDown (critical) đang xảy ra
+inhibit_rules:
+  - source_matchers:
+      - severity="critical"
+      - alertname="NodeExporterDown"
+    target_matchers:
+      - severity="warning"
+      - alertname="HighCPUUsage"
+    equal: ['instance', 'job']
+```
+
+---
+
+### 5. Thông báo Telegram HTML & Khắc phục lỗi Timestamp trong Go Template
+Tạo file `/etc/alertmanager/alert.tmpl`:
+
+```gotemplate
+{{ define "telegram.html" }}
+{{ if eq .Status "firing" }}
+<b>🚨 CANH BÁO SỰ CỐ HỆ THỐNG CHUẨN PRODUCTION</b>
+{{ else }}
+<b>✅ SỰ CỐ ĐÃ ĐƯỢC KHẮC PHỤC (RESOLVED)</b>
+{{ end }}
+------------------------------------
+{{ range .Alerts }}
+<b>Cảnh báo:</b> <code>{{ .Labels.alertname }}</code>
+<b>Mức độ:</b> <code>{{ .Labels.severity | toUpper }}</code>
+<b>Dịch vụ:</b> {{ .Labels.job }}
+<b>Đối tượng:</b> <code>{{ .Labels.instance }}</code>
+<b>Thời gian:</b> <code>{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}</code>
+
+<b>Chi tiết:</b> {{ .Annotations.description }}
+{{ if .Annotations.runbook_url }}
+🔗 <a href="{{ .Annotations.runbook_url }}">Tài liệu hướng dẫn xử lý (Runbook)</a>
+{{ end }}
+------------------------------------
+{{ end }}
+{{ end }}
+```
+
+> **Nguyên nhân lỗi rỗng biến thời gian trên Telegram:** Biến `.StartsAt` là thuộc tính của từng phần tử bên trong danh sách `.Alerts`. Nếu gọi trực tiếp ngoài vòng lặp, Alertmanager không thể render dữ liệu. Đồng thời, Go Template yêu cầu cú pháp định dạng thời gian tham chiếu chuẩn `15:04:05 02/01/2006` để chuyển đổi Unix timestamp sang chuỗi ngày giờ có thể đọc được.
+
+---
+
+### 6. Chuẩn hóa Quy tắc cảnh báo & Công thức tính RAM thực tế (`alert_rules.yml`)
+Cấu hình tại `/etc/prometheus/alert_rules.yml`:
+
+```yaml
+groups:
+  - name: production_node_alerts
+    rules:
+      - alert: NodeExporterDown
+        expr: up{job="node_exporter"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "Node Exporter trên {{ $labels.instance }} mất kết nối"
+          description: "Target {{ $labels.instance }} không phản hồi trong hơn 30 giây."
+          runbook_url: "https://wiki.internal.net/ops/runbook/node-down"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 80
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "Phát hiện tải CPU cao trên {{ $labels.instance }}"
+          description: "Mức sử dụng CPU trên {{ $labels.instance }} hiện là {{ $value | printf \"%.2f\" }}% (> 80%)."
+          runbook_url: "https://wiki.internal.net/ops/runbook/cpu-spike"
+
+      # LƯU Ý: Dùng MemAvailable thay cho MemFree để phản ánh chính xác lượng RAM thực tế có thể cấp phát
+      - alert: HighMemoryUsage
+        expr: 100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 80
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: infrastructure
+        annotations:
+          summary: "Phát hiện tải RAM cao trên {{ $labels.instance }}"
+          description: "Mức sử dụng RAM thực tế trên {{ $labels.instance }} đạt {{ $value | printf \"%.2f\" }}% (> 80%)."
+          runbook_url: "https://wiki.internal.net/ops/runbook/high-ram"
+
+      - alert: DiskSpaceLow
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"}) > 85
+        for: 1m
+        labels:
+          severity: warning
+          team: platform
+          tier: storage
+        annotations:
+          summary: "Phân vùng root (/) sắp hết dung lượng trên {{ $labels.instance }}"
+          description: "Phân vùng root trên {{ $labels.instance }} đã vượt quá 85% dung lượng lưu trữ."
+          runbook_url: "https://wiki.internal.net/ops/runbook/disk-cleanup"
+```
+
+Kiểm tra tính hợp lệ trước khi khởi chạy:
+```bash
+promtool check config /etc/prometheus/prometheus.yml
+promtool check rules /etc/prometheus/alert_rules.yml
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
+---
+
+### 7. Bộ công cụ kiểm thử tự động (`auto_stress.py`)
+Để kiểm thử cảnh báo RAM chính xác mà không làm kích hoạt cơ chế Linux OOM Killer làm sập máy ảo `mon-target`, sử dụng file `scripts/auto_stress.py`:
+
+```bash
+# Cài đặt thư viện trên mon-target:
+sudo apt update && sudo apt install -y python3-psutil stress
+# Ép tải mục tiêu đạt chính xác 85% RAM trong 180 giây:
+python3 scripts/auto_stress.py 85 180
+```
+
+---
+
+### 8. Kịch bản Demo thực hành trực tiếp
+
+#### Kịch bản A: Ép tải RAM, Vòng đời Alert & Thông báo Telegram (Firing ➔ Resolved)
+1. **Kích hoạt tải:** Chạy `python3 scripts/auto_stress.py 85 180` trên `mon-target`.
+2. **Quan sát PENDING:** Trong vòng 5 giây, truy cập Prometheus UI (`http://<IP-server>:9090/alerts`). Rule `HighMemoryUsage` chuyển sang màu vàng **`PENDING`**.
+3. **Quan sát FIRING & Bắn Telegram:** Sau 1 phút duy trì liên tục, rule chuyển sang màu đỏ **`FIRING`**. Alertmanager gom cụm và gửi tin nhắn HTML tức thì về Telegram.
+4. **Tự động phục hồi:** Sau 180 giây, script kết thúc. Lượng RAM tự động giải phóng về mức bình thường. Prometheus chuyển trạng thái và Telegram nhận thông báo **`RESOLVED`**.
+
+#### Kịch bản B: Mô phỏng Exporter chết & Kiểm chứng Triệt tiêu cảnh báo (Alert Inhibition)
+1. **Gây tải CPU:** Chạy `stress-ng --cpu 1 --timeout 300s &` trên `mon-target`.
+2. **Chờ cảnh báo HighCPUUsage xuất hiện:** Kiểm tra trên giao diện Alertmanager (`http://<IP-server>:9093`).
+3. **Mô phỏng sập Exporter:** Dừng dịch vụ: `sudo systemctl stop prometheus-node-exporter`.
+4. **Kiểm chứng cơ chế Inhibition:** Khi `NodeExporterDown` (Critical) kích hoạt, Alertmanager tự động nhận diện và dập tắt (Inhibited) cảnh báo `HighCPUUsage`. Quản trị viên chỉ nhận duy nhất 1 thông báo lỗi gốc `NodeExporterDown`.
