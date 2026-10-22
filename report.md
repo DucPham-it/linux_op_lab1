@@ -51,19 +51,6 @@
   - [3. Cấp phát Mục tiêu Giám sát Động qua File-based Service Discovery](#3-cấp-phát-mục-tiêu-giám-sát-động-qua-file-based-service-discovery)
   - [4. Xây dựng Pipeline Triển khai Tự động An toàn (`deploy_stack.sh`)](#4-xây-dựng-pipeline-triển-khai-tự-động-an-toàn-deploy_stacksh)
   - [5. Bảng So sánh Toàn diện Phương thức Vận hành ClickOps vs. GitOps](#5-bảng-so-sánh-toàn-diện-phương-thức-vận-hành-clickops-vs-gitops)
-  - [5. Tường lửa Hạ tầng UFW và Vô hiệu hóa Endpoint Quản trị Nhạy cảm](#5-tường-lửa-hạ-tầng-ufw-và-vô-hiệu-hóa-endpoint-quản-trị-nhạy-cảm)
-  - [6. Kịch bản Kiểm thử Bảo mật và Bảng Checklist Hardening](#6-kịch-bản-kiểm-thử-bảo-mật-và-bảng-checklist-hardening)
-- [VI. OPTIMIZATION: TỐI ƯU HÓA HIỆU NĂNG, METRIC VÀ TSDB](#vi-optimization-tối-ưu-hóa-hiệu-năng-metric-và-tsdb)
-  - [1. Quản lý Metric Cardinality và Kỹ thuật Relabeling](#1-quản-lý-metric-cardinality-và-kỹ-thuật-relabeling)
-  - [2. Tối ưu hóa Truy vấn với Recording Rules trong Prometheus](#2-tối-ưu-hóa-truy-vấn-với-recording-rules-trong-prometheus)
-  - [3. Application Performance Monitoring (APM) & Golden Signals](#3-application-performance-monitoring-apm--golden-signals)
-  - [4. Tinh chỉnh Bộ máy Lưu trữ Nội tại (TSDB Engine Tuning)](#4-tinh-chỉnh-bộ-máy-lưu-trữ-nội-tại-tsdb-engine-tuning)
-- [VII. GITOPS, MONITORING AS CODE: TỰ ĐỘNG HÓA HẠ TẦNG GIÁM SÁT](#vii-gitops-monitoring-as-code-tự-động-hóa-hạ-tầng-giám-sát)
-  - [1. Đặt vấn đề: Thảm họa ClickOps và Triết lý Monitoring-as-Code](#1-đặt-vấn-đề-thảm-họa-clickops-và-triết-lý-monitoring-as-code)
-  - [2. Khai báo Nguồn dữ liệu và Dashboard Tự động (Grafana Provisioning)](#2-khai-báo-nguồn-dữ-liệu-và-dashboard-tự-động-grafana-provisioning)
-  - [3. Cấp phát Mục tiêu Giám sát Động qua File-based Service Discovery](#3-cấp-phát-mục-tiêu-giám-sát-động-qua-file-based-service-discovery)
-  - [4. Xây dựng Pipeline Triển khai Tự động An toàn (`deploy_stack.sh`)](#4-xây-dựng-pipeline-triển-khai-tự-động-an-toàn-deploy_stacksh)
-  - [5. Bảng So sánh Toàn diện Phương thức Vận hành ClickOps vs. GitOps](#5-bảng-so-sánh-toàn-diện-phương-thức-vận-hành-clickops-vs-gitops)
 
 ---
 
@@ -1248,11 +1235,151 @@ if __name__ == '__main__':
 
 ## 4. Tinh chỉnh Bộ máy Lưu trữ Nội tại (TSDB Engine Tuning)
 
-Để Prometheus hoạt động bền bỉ trong môi trường tải lớn:
-1. **WAL Chunk Flush:** Điều chỉnh kích thước bộ đệm ghi đĩa để gom nhiều mẫu thành một đợt I/O tuần tự thay vì ghi ngẫu nhiên từng dòng.
-2. **Độ dài cửa sổ thời gian cho hàm `rate()`:**
-   $$\text{Window size} \ge 4 \times \text{scrape\_interval}$$
-   Nếu `scrape_interval: 5s`, cửa sổ tối thiểu nên là `[20s]` hoặc chuẩn hóa là `[1m]`. Không bao giờ chọn cửa sổ nhỏ hơn $2 \times \text{scrape\_interval}$ vì sẽ dẫn đến hiện tượng đồ thị bị gãy nét (gap) khi có một nhịp cào bị trễ.
+Bộ máy lưu trữ chuỗi thời gian (TSDB) của Prometheus được thiết kế chuyên biệt cho tải đọc/ghi khối lượng lớn dữ liệu số theo thời gian thực. Để hệ thống vận hành bền bỉ trên môi trường Linux Server với tài nguyên RAM và I/O giới hạn, cần hiểu rõ cơ chế nội tại và áp dụng các phương pháp tinh chỉnh toàn diện:
+
+### 4.1. Kiến trúc Vòng đời Dữ liệu TSDB (TSDB Lifecycle & Block Layout)
+
+```mermaid
+flowchart TD
+    Scrape[Scrape Loop: Mẫu Metric Mới] -->|1. Ghi tuần tự ra đĩa| WAL[Write-Ahead Log / WAL]
+    Scrape -->|2. Nạp vào bộ nhớ nhanh| HeadMem[Head Block: In-Memory Chunks]
+    
+    HeadMem -->|Đủ 120 mẫu / 2 giờ| MemMapped[Memory-Mapped Chunks on Disk]
+    MemMapped -->|Chu kỳ Compaction 2 giờ| BlockDir["2-Hour Block Directory (Bất biến)"]
+    
+    subgraph Block_Structure ["Cấu trúc 1 Thư mục Block (UUID/):"]
+        Meta["meta.json: Thống kê & Chu kỳ thời gian"]
+        Index["index: Chỉ mục Bitmap tìm kiếm nhãn siêu tốc"]
+        Chunks["chunks/000001: Dữ liệu nén XOR / Gorilla"]
+        Tombstone["tombstones: Bản ghi đánh dấu xóa logic"]
+    end
+    
+    BlockDir --> Block_Structure
+    Block_Structure -->|Cũ hơn retention.time / retention.size| Cleaner[Tự động xóa dọn dẹp theo FIFO]
+```
+
+#### Giải thích cấu trúc thư mục Block trên đĩa (`/var/lib/prometheus/data/`):
+- **`chunks/`**: Chứa các tệp lưu trữ dữ liệu chuỗi thời gian đã được nén bằng thuật toán **Gorilla/XOR float64**, mỗi mẫu dữ liệu chỉ tốn khoảng 1.3 - 2 bytes.
+- **`index`**: Tệp chỉ mục nhãn (Inverted Index) dạng Bitmap nhị phân, cho phép truy vấn cực nhanh hàng triệu chuỗi dữ liệu theo bất kỳ nhãn nào mà không phải quét toàn bộ ổ cứng.
+- **`meta.json`**: Chứa thông tin siêu dữ liệu (thời gian bắt đầu `minTime`, thời gian kết thúc `maxTime`, số lượng chuỗi dữ liệu, số mẫu và thế hệ compaction).
+- **`tombstones`**: Khi có yêu cầu xóa metric, TSDB không xóa vật lý ngay mà chỉ ghi vào `tombstones` để đảm bảo tốc độ và an toàn I/O; dữ liệu chỉ bị loại bỏ hoàn toàn khi diễn ra chu kỳ Compaction tiếp theo.
+
+---
+
+### 4.2. Bộ cờ Cấu hình Khởi chạy Tối ưu hóa TSDB (Production CLI Flags)
+
+Chỉnh sửa tệp cấu hình tham số khởi chạy của Prometheus (`/etc/default/prometheus` trên Debian/Ubuntu hoặc file systemd service):
+
+```bash
+# /etc/default/prometheus
+ARGS="--config.file=/etc/prometheus/prometheus.yml \
+      --storage.tsdb.path=/var/lib/prometheus/data \
+      --storage.tsdb.retention.time=15d \
+      --storage.tsdb.retention.size=10GB \
+      --storage.tsdb.wal-compression \
+      --storage.tsdb.min-block-duration=2h \
+      --storage.tsdb.max-block-duration=2h \
+      --storage.tsdb.wal-segment-size=128MB \
+      --query.max-samples=50000000 \
+      --query.timeout=2m \
+      --query.max-concurrency=20 \
+      --web.enable-lifecycle"
+```
+
+#### Chi tiết tác dụng kỹ thuật của từng tham số:
+
+| Cờ Tham số (CLI Flag) | Giá trị khuyến nghị | Ý nghĩa và Lợi ích vận hành |
+| :--- | :--- | :--- |
+| `--storage.tsdb.wal-compression` | `enabled` (mặc định) | Bật thuật toán nén Snappy cho các tệp WAL, **giảm 30% đến 50% dung lượng ghi đĩa** và băng thông I/O. |
+| `--storage.tsdb.min-block-duration` | `2h` | Thời gian khối block tối thiểu trước khi cắt thành block bất biến. Cố định 2h giúp đồng bộ hoàn hảo với Thanos Sidecar. |
+| `--storage.tsdb.max-block-duration` | `2h` | Cố định khối block tối đa là 2 giờ, ngăn Prometheus tự động gộp các block quá to làm chậm tiến trình đẩy lên Object Storage. |
+| `--storage.tsdb.retention.time` | `15d` | Thời gian lưu trữ cục bộ tối đa. Dữ liệu cũ hơn 15 ngày sẽ tự động bị xóa. |
+| `--storage.tsdb.retention.size` | `10GB` | Giới hạn dung lượng thư mục TSDB. Nếu vượt ngưỡng 10GB, TSDB tự động dọn dẹp các khối cũ nhất theo cơ chế FIFO. |
+| `--query.max-samples` | `50000000` | Giới hạn số mẫu tối đa được nạp vào RAM cho một biểu thức truy vấn, **ngăn chặn sự cố Out-Of-Memory (OOM)** khi người dùng vô tình quét khoảng thời gian quá dài. |
+| `--query.timeout` | `2m` | Thời gian chờ tối đa cho một truy vấn PromQL trước khi hủy bỏ để giải phóng tài nguyên CPU. |
+| `--query.max-concurrency` | `20` | Giới hạn số lượng truy vấn PromQL chạy đồng thời, tránh hiện tượng nghẽn hàng đợi xử lý. |
+
+---
+
+### 4.3. Tinh chỉnh Hệ điều hành Linux Kernel và I/O Subsystem
+
+Bên cạnh tham số ứng dụng, tầng hệ điều hành Linux đóng vai trò quyết định tới độ ổn định của TSDB:
+
+#### 1. Mở rộng giới hạn Bộ nhớ ảo (`vm.max_map_count`):
+Prometheus TSDB sử dụng rất nhiều lệnh gọi hệ thống `mmap()` để ánh xạ trực tiếp các khối block trên đĩa vào không gian địa chỉ bộ nhớ ảo. Mặc định trên Linux giá trị này chỉ là `65530`, dễ dẫn đến lỗi `"cannot allocate memory"` khi số lượng block tăng lên.
+```bash
+# Thêm vào /etc/sysctl.d/99-prometheus.conf
+vm.max_map_count = 262144
+
+# Nạp cấu hình ngay lập tức:
+sudo sysctl -p /etc/sysctl.d/99-prometheus.conf
+```
+
+#### 2. Tinh chỉnh Giới hạn Tệp Mở (File Descriptors):
+Mỗi chunk và socket kết nối đều tiêu tốn một file descriptor. Cần nâng giới hạn trong file dịch vụ systemd `/etc/systemd/system/prometheus.service`:
+```ini
+[Service]
+LimitNOFILE=65536
+LimitNPROC=4096
+```
+
+#### 3. Tối ưu hóa I/O File System Mount:
+Đảm bảo thư mục lưu trữ `/var/lib/prometheus` được gắn trên phân vùng riêng biệt với các tùy chọn mount:
+```text
+/dev/sdb1  /var/lib/prometheus  ext4  noatime,nodiratime,data=ordered,barrier=1  0  2
+```
+- `noatime,nodiratime`: Loại bỏ việc cập nhật thời gian đọc tệp (Access Time), giảm triệt để các thao tác ghi đĩa vô ích.
+
+---
+
+### 4.4. Quy tắc Chọn Range Vector và Time Window Chuẩn mực cho PromQL
+
+Một lỗi phổ biến khiến đồ thị trên Grafana bị đứt đoạn hoặc gãy nét (gap) là chọn cửa sổ thời gian (Range Vector) quá ngắn cho hàm `rate()` hoặc `irate()`:
+
+$$\text{Quy tắc Bắt buộc:}\quad \text{Range Vector Window} \ge 4 \times \text{scrape\_interval}$$
+
+```mermaid
+flowchart LR
+    subgraph Bad_Query [Cửa sổ quá ngắn: rate[5s] với scrape 5s]
+        S1[Sample 1] --- Gap[Khoảng trống / Mất mẫu] --- S2[Sample 2]
+        Gap --> Error[Lỗi: Không đủ 2 điểm đo -> Đồ thị bị gãy đứt]
+    end
+
+    subgraph Good_Query [Cửa sổ chuẩn: rate[1m] với scrape 5s]
+        M1[Sample 1] --- M2[Sample 2] --- M3[Sample 3] --- M4[Sample 4] --- M12[...12 Samples]
+        M12 --> Smooth[Tính gradient mượt mà & chính xác 100%]
+    end
+```
+
+#### Bảng Quy chuẩn Tương quan Chu kỳ Scrape và Range Vector:
+
+| Chu kỳ cào dữ liệu (`scrape_interval`) | Cửa sổ tối thiểu lý thuyết ($2\times$) | Cửa sổ Production Khuyến nghị ($4\times - 12\times$) |
+| :--- | :--- | :--- |
+| **5 giây** (`5s`) | `[10s]` | **`[1m]`** (Chứa ~12 mẫu đo, triệt tiêu nhiễu giật cục) |
+| **15 giây** (`15s`) | `[30s]` | **`[2m]`** (Chứa ~8 mẫu đo) |
+| **30 giây** (`30s`) | `[1m]` | **`[5m]`** (Chuẩn mực cho dịch vụ quy mô lớn) |
+
+---
+
+### 4.5. Bộ Công cụ Phân tích và Dọn dẹp TSDB Nội tại (`promtool tsdb`)
+
+Prometheus cung cấp công cụ `promtool tsdb` giúp kỹ sư kiểm tra "sức khỏe", phân tích top metric ngốn bộ nhớ nhất và bảo trì cơ sở dữ liệu:
+
+#### 1. Phân tích Top Metric chiếm tài nguyên lớn nhất (High Cardinality Investigator):
+```bash
+# Phân tích sâu trực tiếp vào thư mục dữ liệu TSDB
+promtool tsdb analyze /var/lib/prometheus/data
+```
+Lệnh này xuất ra báo cáo chi tiết:
+- **Top 10 Metrics có số lượng Series nhiều nhất.**
+- **Top 10 Labels có số lượng giá trị đa dạng nhất.**
+- Tổng số lượng Samples, Chunk, và Block hiện có.
+
+#### 2. Dọn dẹp Tombstone và Khối Block Lỗi:
+```bash
+# Kiểm tra tính toàn vẹn của toàn bộ các khối TSDB trên đĩa
+promtool check config /etc/prometheus/prometheus.yml
+```
 
 ---
 
