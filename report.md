@@ -76,11 +76,11 @@ Trong kỷ nguyên điện toán đám mây và kiến trúc phân tán (Microse
 
 ```mermaid
 flowchart LR
-    A[Hạ tầng & Ứng dụng] -->|1. Thu thập Metrics định kỳ| B[Prometheus TSDB]
-    A -->|2. Đẩy Logs sự kiện| C[Log Aggregator / Loki]
-    B -->|Phát hiện ngưỡng bất thường| D[Alertmanager -> Báo động Kỹ sư]
-    B -->|Vẽ biểu đồ xu hướng| E[Grafana Dashboard]
-    D -->|Kỹ sư nhận cảnh báo| F[Mở Grafana định vị Node lỗi]
+    A["Hạ tầng & Ứng dụng"] -->|1. Thu thập Metrics định kỳ| B["Prometheus TSDB"]
+    A -->|2. Đẩy Logs sự kiện| C["Log Aggregator / Loki"]
+    B -->|Phát hiện ngưỡng bất thường| D["Alertmanager: Báo động Kỹ sư"]
+    B -->|Vẽ biểu đồ xu hướng| E["Grafana Dashboard"]
+    D -->|Kỹ sư nhận cảnh báo| F["Mở Grafana định vị Node lỗi"]
     F -->|Dò chi tiết nguyên nhân| C
 ```
 
@@ -126,12 +126,12 @@ Việc triển khai một hệ thống Giám sát & Ghi log tự động mang l�
 
 ```mermaid
 flowchart TD
-    subgraph Pull_Model [Mô hình Pull - Prometheus]
-        Server1[Prometheus Server] -->|HTTP GET /metrics định kỳ| Target1[Node Exporter :9100]
-        Server1 -.->|Không trả lời -> up=0| Target1
+    subgraph Pull_Model ["Mô hình Pull - Prometheus"]
+        Server1["Prometheus Server"] -->|HTTP GET /metrics định kỳ| Target1["Node Exporter :9100"]
+        Server1 -.->|Không phản hồi: up=0| Target1
     end
-    subgraph Push_Model [Mô hình Push - Graphite/Telegraf]
-        Agent2[Push Agent] -->|Gửi dữ liệu dồn dập| Server2[Central InfluxDB/Graphite]
+    subgraph Push_Model ["Mô hình Push - Graphite/Telegraf"]
+        Agent2["Push Agent"] -->|Gửi dữ liệu dồn dập| Server2["Central InfluxDB/Graphite"]
     end
 ```
 
@@ -199,14 +199,14 @@ graph LR
         subgraph Bridge_Network ["Virtual Network: default (virbr0: 192.168.122.0/24)"]
             
             subgraph VM_Server ["VM 1: mon-server (1.5GB RAM, 1 vCPU)"]
-                Prometheus["Prometheus (:9090)<br/>TSDB Engine"]
-                Alertmanager["Alertmanager (:9093)<br/>Router & Dispatcher"]
-                Grafana["Grafana (:3000)<br/>Visual Dashboard"]
+                Prometheus["Prometheus (:9090)<br>TSDB Engine"]
+                Alertmanager["Alertmanager (:9093)<br>Router & Dispatcher"]
+                Grafana["Grafana (:3000)<br>Visual Dashboard"]
             end
             
             subgraph VM_Target ["VM 2: mon-target (512MB RAM, 1 vCPU)"]
-                NodeExporter["Node Exporter (:9100)<br/>OS Metrics Collector"]
-                StressTool["stress-ng & auto_stress.py<br/>Load Generators"]
+                NodeExporter["Node Exporter (:9100)<br>OS Metrics Collector"]
+                StressTool["stress-ng & auto_stress.py<br>Load Generators"]
             end
             
         end
@@ -215,7 +215,7 @@ graph LR
     Prometheus -->|Scrape metrics mỗi 5s| NodeExporter
     Prometheus -->|Bắn cảnh báo khi vượt ngưỡng| Alertmanager
     Grafana -->|Truy vấn PromQL| Prometheus
-    Alertmanager -->|Gửi cảnh báo HTML| TelegramBot[Telegram Bot Channel]
+    Alertmanager -->|Gửi cảnh báo HTML| TelegramBot["Telegram Bot Channel"]
 ```
 
 ### Thông số kỹ thuật của các nút:
@@ -472,16 +472,16 @@ ARGS="--config.file=/etc/prometheus/prometheus.yml \
 
 ```mermaid
 flowchart TD
-    subgraph Target_Cluster [Cụm Máy chủ Mục tiêu]
-        Target[mon-target :9100]
+    subgraph Target_Cluster ["Cụm Máy chủ Mục tiêu"]
+        Target["mon-target :9100"]
     end
 
-    subgraph HA_Prometheus [Prometheus Dual Replicas Active-Active]
+    subgraph HA_Prometheus ["Prometheus Dual Replicas Active-Active"]
         Prom1["Prometheus 01 (Replica A)"]
         Prom2["Prometheus 02 (Replica B)"]
     end
 
-    subgraph Deduplication_Layer [Alertmanager Cluster]
+    subgraph Deduplication_Layer ["Alertmanager Cluster"]
         AM1["Alertmanager 01"]
         AM2["Alertmanager 02"]
     end
@@ -495,7 +495,7 @@ flowchart TD
     Prom2 -->|Bắn cảnh báo độc lập| AM2
 
     AM1 <-->|Mesh Gossip / Đồng bộ trạng thái| AM2
-    AM1 -->|Khử trùng lặp -> Chỉ gửi 1 tin duy nhất| Telegram[Telegram Bot]
+    AM1 -->|Khử trùng lặp -> Chỉ gửi 1 tin| Telegram["Telegram Bot"]
 ```
 
 ### Cơ chế Khử trùng lặp (Deduplication) của Alertmanager:
@@ -509,12 +509,12 @@ Cả hai Prometheus Replicas cùng cào một máy chủ và độc lập phát 
 
 ```mermaid
 flowchart LR
-    PromTSDB[(Prometheus TSDB)] -->|Cứ 2 giờ đóng băng block| ThanosSidecar[Thanos Sidecar]
-    ThanosSidecar -->|Tự động đẩy khối 2h| MinIO[(MinIO Object Storage / S3)]
+    PromTSDB[("Prometheus TSDB")] -->|Cứ 2 giờ đóng băng block| ThanosSidecar["Thanos Sidecar"]
+    ThanosSidecar -->|Tự động đẩy khối 2h| MinIO[("MinIO Object Storage / S3")]
     
-    GrafanaUser[Grafana] -->|Truy vấn dữ liệu| ThanosQuerier[Thanos Querier]
+    GrafanaUser["Grafana"] -->|Truy vấn dữ liệu| ThanosQuerier["Thanos Querier"]
     ThanosQuerier -->|Truy vấn dữ liệu Realtime| ThanosSidecar
-    ThanosQuerier -->|Truy vấn dữ liệu Lịch sử nhiều tháng| ThanosStore[Thanos Store Gateway]
+    ThanosQuerier -->|Truy vấn dữ liệu Lịch sử nhiều tháng| ThanosStore["Thanos Store Gateway"]
     ThanosStore --> MinIO
 ```
 
@@ -592,24 +592,24 @@ Hệ thống cảnh báo được phân tách rành mạch thành 3 lớp chuyê
 
 ```mermaid
 flowchart TD
-    subgraph Layer1 [Lớp 1: Phát hiện - Detection]
-        Prom[Prometheus Server]
-        RuleEngine[Rule Evaluation Engine]
+    subgraph Layer1 ["Lớp 1: Phát hiện - Detection"]
+        Prom["Prometheus Server"]
+        RuleEngine["Rule Evaluation Engine"]
         Prom --> RuleEngine
     end
 
-    subgraph Layer2 [Lớp 2: Xử lý & Định tuyến - Alertmanager]
-        AM[Alertmanager Core]
-        Grouping[Gom cụm - Grouping]
-        Inhibition[Triệt tiêu - Inhibition]
-        Routing[Định tuyến - Routing Matrix]
+    subgraph Layer2 ["Lớp 2: Xử lý & Định tuyến - Alertmanager"]
+        AM["Alertmanager Core"]
+        Grouping["Gom cụm - Grouping"]
+        Inhibition["Triệt tiêu - Inhibition"]
+        Routing["Định tuyến - Routing Matrix"]
         AM --> Grouping --> Inhibition --> Routing
     end
 
-    subgraph Layer3 [Lớp 3: Tiếp nhận - Notification Channels]
-        Telegram[Telegram Bot Channel]
-        Email[Email Ops]
-        OnCall[PagerDuty / Opsgenie]
+    subgraph Layer3 ["Lớp 3: Tiếp nhận - Notification Channels"]
+        Telegram["Telegram Bot Channel"]
+        Email["Email Ops"]
+        OnCall["PagerDuty / Opsgenie"]
     end
 
     RuleEngine -->|Bắn cảnh báo qua HTTP POST /api/v2/alerts| AM
@@ -864,11 +864,11 @@ sequenceDiagram
     Note over Target: RAM vượt ngưỡng 80%
     Target-->>Prom: Scrape metrics (RAM = 85%)
     Note over Prom: Trạng thái: PENDING (đợi đủ 1m)
-    Note over Prom: Đủ 1m -> Chuyển sang FIRING
+    Note over Prom: Đủ 1m chuyển sang FIRING
     Prom->>AM: Bắn Alert (HostOutOfMemory)
     AM->>AM: Gom cụm (group_wait 10s)
     AM->>Tele: Gửi tin nhắn HTML cảnh báo sự cố 🚨
-    Note over Target: Hết 180s -> RAM tự động giải phóng về bình thường
+    Note over Target: Hết 180s tự giải phóng RAM về bình thường
     Target-->>Prom: Scrape metrics (RAM < 80%)
     Note over Prom: Chuyển sang RESOLVED
     Prom->>AM: Bắn thông báo phục hồi
@@ -911,14 +911,14 @@ Giải pháp chuẩn công nghiệp là đặt một **Nginx Reverse Proxy** đ�
 
 ```mermaid
 flowchart LR
-    Browser[Trình duyệt / Người dùng] -->|HTTPS 443 / Mã hóa TLS 1.3| Nginx[Nginx Reverse Proxy]
+    Browser["Trình duyệt / Người dùng"] -->|HTTPS 443 / Mã hóa TLS 1.3| Nginx["Nginx Reverse Proxy"]
     Browser -.->|HTTP 80| Nginx
     Nginx -.->|301 Redirect sang HTTPS| Browser
     
     subgraph Internal_Only ["Localhost Only (127.0.0.1)"]
-        Nginx -->|Proxy pass| GrafanaLocal[Grafana :3000]
-        Nginx -->|Proxy pass + Basic Auth| PromLocal[Prometheus :9090]
-        Nginx -->|Proxy pass + Basic Auth| AMLocal[Alertmanager :9093]
+        Nginx -->|Proxy pass| GrafanaLocal["Grafana :3000"]
+        Nginx -->|Proxy pass + Basic Auth| PromLocal["Prometheus :9090"]
+        Nginx -->|Proxy pass + Basic Auth| AMLocal["Alertmanager :9093"]
     end
 ```
 
@@ -1131,17 +1131,17 @@ Trong thực tế, một bảng điều khiển Grafana gồm nhiều đồ th�
 
 ```mermaid
 flowchart TD
-    subgraph Traditional_Workflow [Trước khi có Recording Rules]
-        RawTSDB[(Raw Metrics: node_cpu_seconds_total)] -->|Quét hàng triệu mẫu thô mỗi 5s| QueryEngine[PromQL Engine]
-        QueryEngine -->|Tính toán nặng| Grafana1[Grafana Dashboard]
-        QueryEngine -->|Tính toán nặng| AlertEngine[Alerting Engine]
+    subgraph Traditional_Workflow ["Trước khi có Recording Rules"]
+        RawTSDB[("Raw Metrics: node_cpu_seconds_total")] -->|Quét hàng triệu mẫu thô mỗi 5s| QueryEngine["PromQL Engine"]
+        QueryEngine -->|Tính toán nặng| Grafana1["Grafana Dashboard"]
+        QueryEngine -->|Tính toán nặng| AlertEngine["Alerting Engine"]
     end
 
-    subgraph Optimized_Workflow [Sau khi triển khai Recording Rules]
-        RawTSDB2[(Raw Metrics)] -->|Prometheus tính trước mỗi 15s| RecordRule[Recording Rule: instance:cpu_usage:percent]
-        RecordRule -->|Lưu kết quả mới vào TSDB| NewTSDB[(Pre-computed Series)]
-        NewTSDB -->|Đọc tức thì trong 1ms| Grafana2[Grafana Dashboard]
-        NewTSDB -->|Đọc tức thì trong 1ms| AlertEngine2[Alerting Engine]
+    subgraph Optimized_Workflow ["Sau khi triển khai Recording Rules"]
+        RawTSDB2[("Raw Metrics")] -->|Prometheus tính trước mỗi 15s| RecordRule["Recording Rule: instance:cpu_usage:percent"]
+        RecordRule -->|Lưu kết quả mới vào TSDB| NewTSDB[("Pre-computed Series")]
+        NewTSDB -->|Đọc tức thì trong 1ms| Grafana2["Grafana Dashboard"]
+        NewTSDB -->|Đọc tức thì trong 1ms| AlertEngine2["Alerting Engine"]
     end
 ```
 
@@ -1241,10 +1241,10 @@ Bộ máy lưu trữ chuỗi thời gian (TSDB) của Prometheus được thiế
 
 ```mermaid
 flowchart TD
-    Scrape[Scrape Loop: Mẫu Metric Mới] -->|1. Ghi tuần tự ra đĩa| WAL[Write-Ahead Log / WAL]
-    Scrape -->|2. Nạp vào bộ nhớ nhanh| HeadMem[Head Block: In-Memory Chunks]
+    Scrape["Scrape Loop: Mẫu Metric Mới"] -->|1. Ghi tuần tự ra đĩa| WAL["Write-Ahead Log / WAL"]
+    Scrape -->|2. Nạp vào bộ nhớ nhanh| HeadMem["Head Block: In-Memory Chunks"]
     
-    HeadMem -->|Đủ 120 mẫu / 2 giờ| MemMapped[Memory-Mapped Chunks on Disk]
+    HeadMem -->|Đủ 120 mẫu / 2 giờ| MemMapped["Memory-Mapped Chunks on Disk"]
     MemMapped -->|Chu kỳ Compaction 2 giờ| BlockDir["2-Hour Block Directory (Bất biến)"]
     
     subgraph Block_Structure ["Cấu trúc 1 Thư mục Block (UUID/):"]
@@ -1255,7 +1255,7 @@ flowchart TD
     end
     
     BlockDir --> Block_Structure
-    Block_Structure -->|Cũ hơn retention.time / retention.size| Cleaner[Tự động xóa dọn dẹp theo FIFO]
+    Block_Structure -->|Cũ hơn retention.time / retention.size| Cleaner["Tự động xóa dọn dẹp theo FIFO"]
 ```
 
 #### Giải thích cấu trúc thư mục Block trên đĩa (`/var/lib/prometheus/data/`):
@@ -1336,18 +1336,20 @@ LimitNPROC=4096
 
 Một lỗi phổ biến khiến đồ thị trên Grafana bị đứt đoạn hoặc gãy nét (gap) là chọn cửa sổ thời gian (Range Vector) quá ngắn cho hàm `rate()` hoặc `irate()`:
 
-$$\text{Quy tắc Bắt buộc:}\quad \text{Range Vector Window} \ge 4 \times \text{scrape\_interval}$$
+> [!IMPORTANT]
+> **Quy tắc Bắt buộc:** `Range Vector Window >= 4 * scrape_interval`  
+> *(Độ dài cửa sổ thời gian của hàm `rate()` hoặc `irate()` phải tối thiểu gấp 4 lần chu kỳ `scrape_interval`)*
 
 ```mermaid
 flowchart LR
-    subgraph Bad_Query [Cửa sổ quá ngắn: rate[5s] với scrape 5s]
-        S1[Sample 1] --- Gap[Khoảng trống / Mất mẫu] --- S2[Sample 2]
-        Gap --> Error[Lỗi: Không đủ 2 điểm đo -> Đồ thị bị gãy đứt]
+    subgraph Bad_Query ["Cửa sổ quá ngắn: rate(5s) với scrape 5s"]
+        S1["Sample 1"] --- Gap["Khoảng trống / Mất mẫu"] --- S2["Sample 2"]
+        Gap --> Error["Lỗi: Không đủ 2 điểm đo -> Đồ thị bị đứt nét"]
     end
 
-    subgraph Good_Query [Cửa sổ chuẩn: rate[1m] với scrape 5s]
-        M1[Sample 1] --- M2[Sample 2] --- M3[Sample 3] --- M4[Sample 4] --- M12[...12 Samples]
-        M12 --> Smooth[Tính gradient mượt mà & chính xác 100%]
+    subgraph Good_Query ["Cửa sổ chuẩn: rate(1m) với scrape 5s"]
+        M1["Sample 1"] --- M2["Sample 2"] --- M3["Sample 3"] --- M4["Sample 4"] --- M12["...12 Samples"]
+        M12 --> Smooth["Tính gradient mượt mà & chính xác 100%"]
     end
 ```
 
