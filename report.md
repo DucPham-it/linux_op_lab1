@@ -52,8 +52,12 @@
   - [4. Xây dựng Pipeline Triển khai Tự động An toàn (`deploy_stack.sh`)](#4-xây-dựng-pipeline-triển-khai-tự-động-an-toàn-deploy_stacksh)
   - [5. Bảng So sánh Toàn diện Phương thức Vận hành ClickOps vs. GitOps](#5-bảng-so-sánh-toàn-diện-phương-thức-vận-hành-clickops-vs-gitops)
 
-- [VIII. Phần mở rộng](#viii-phần-mở-rộng)
-  - [1. Chuẩn hóa truy vấn bằng Recording Rules](#1-chuẩn-hóa-truy-vấn-bằng-recording-rules)
+- [VIII. Recording Rules](#viii-recording-rules)
+  - [1. Đặt vấn đề: Truy vấn Lặp và Sai lệch Công thức Giám sát](#1-đặt-vấn-đề-truy-vấn-lặp-và-sai-lệch-công-thức-giám-sát)
+  - [2. Cơ chế Tính toán Định kỳ và Lưu trữ Metric trong Prometheus](#2-cơ-chế-tính-toán-định-kỳ-và-lưu-trữ-metric-trong-prometheus)
+  - [3. Thiết kế Recording Rules và Tích hợp Grafana, Alerting Rules](#3-thiết-kế-recording-rules-và-tích-hợp-grafana-alerting-rules)
+  - [4. Kịch bản Kiểm chứng Dữ liệu và Đánh giá Hiệu năng Truy vấn](#4-kịch-bản-kiểm-chứng-dữ-liệu-và-đánh-giá-hiệu-năng-truy-vấn)
+  - [5. Đánh giá Khả năng Tái sử dụng và Giới hạn của Recording Rules](#5-đánh-giá-khả-năng-tái-sử-dụng-và-giới-hạn-của-recording-rules)
 
 ---
 
@@ -1127,7 +1131,7 @@ scrape_configs:
 
 ## 2. Tái sử dụng kết quả truy vấn với Recording Rules
 
-Recording Rules cho phép định kỳ tính toán biểu thức PromQL và lưu kết quả để dashboard và alert tái sử dụng. Phần mở rộng VIII.1 trình bày vấn đề tồn đọng, cơ sở lựa chọn, cấu hình và phương pháp kiểm chứng cho các chỉ số tài nguyên. Hiệu quả định lượng cần được đánh giá bằng thực nghiệm, không suy ra trực tiếp từ việc rút gọn biểu thức truy vấn.
+Recording Rules cho phép định kỳ tính toán biểu thức PromQL và lưu kết quả để dashboard và alert tái sử dụng. Phần VIII trình bày vấn đề tồn đọng, cơ sở lựa chọn, cấu hình và phương pháp kiểm chứng cho các chỉ số tài nguyên. Hiệu quả định lượng cần được đánh giá bằng thực nghiệm, không suy ra trực tiếp từ việc rút gọn biểu thức truy vấn.
 
 ---
 
@@ -1488,19 +1492,15 @@ echo "=========================================================="
 
 ---
 
-# VIII. Phần mở rộng
+# VIII. Recording Rules
 
-Các hướng mở rộng bổ sung cho hệ thống giám sát cơ sở được trình bày thành các mục độc lập. Mỗi mục xác định vấn đề tồn đọng, phương pháp lựa chọn, cấu hình triển khai, tiêu chí kiểm chứng và phạm vi giải quyết. Kết quả thực nghiệm được phân biệt với lợi ích kỳ vọng; các nhận định định lượng cần có dữ liệu đo tương ứng.
-
-## 1. Chuẩn hóa truy vấn bằng Recording Rules
-
-### 1.1. Vấn đề tồn đọng
+## 1. Đặt vấn đề: Truy vấn Lặp và Sai lệch Công thức Giám sát
 
 Dashboard Grafana và các alert sử dụng chung dữ liệu từ Node Exporter nhưng có thể khai báo công thức CPU, RAM và đĩa tại nhiều vị trí. Cách tổ chức này phát sinh phép tính lặp, nguy cơ không nhất quán giữa giá trị hiển thị và điều kiện cảnh báo, đồng thời làm tăng số vị trí cần cập nhật khi thay đổi công thức.
 
-Mục tiêu mở rộng là tập trung công thức tính, chuẩn hóa tên metric và tái sử dụng kết quả cho dashboard và alert.
+Mục tiêu là tập trung công thức tính, chuẩn hóa tên metric và tái sử dụng kết quả cho dashboard và alert.
 
-### 1.2. Phương pháp được lựa chọn
+## 2. Cơ chế Tính toán Định kỳ và Lưu trữ Metric trong Prometheus
 
 Nhóm lựa chọn Recording Rules, chức năng có sẵn của Prometheus, để đánh giá biểu thức PromQL định kỳ và ghi kết quả thành chuỗi thời gian mới trong TSDB. Giải pháp không bổ sung dịch vụ và phù hợp với kiến trúc hiện có.
 
@@ -1516,7 +1516,9 @@ Node Exporter → Prometheus → Metric gốc trong TSDB
 
 Recording Rule tạo dữ liệu đầu ra, còn Alerting Rule đánh giá điều kiện cảnh báo. Việc gửi thông báo tiếp tục do Alertmanager đảm nhiệm.
 
-### 1.3. Cấu hình triển khai
+## 3. Thiết kế Recording Rules và Tích hợp Grafana, Alerting Rules
+
+### 3.1. Nhóm Rule và Các Metric Tài nguyên
 
 File `configs/prometheus/recording_rules.yml` khai báo nhóm `linux_host_recording_rules` với chu kỳ `5s`. Cấu hình gồm năm metric:
 
@@ -1527,6 +1529,8 @@ File `configs/prometheus/recording_rules.yml` khai báo nhóm `linux_host_record
 | `instance:root_disk_usage:percent` | Dung lượng filesystem gốc sử dụng theo `size - free` | % |
 | `instance:network_receive_bytes:rate1m` | Tốc độ nhận của giao diện được chọn trong cửa sổ 1 phút | byte/s |
 | `instance:network_transmit_bytes:rate1m` | Tốc độ gửi của giao diện được chọn trong cửa sổ 1 phút | byte/s |
+
+### 3.2. Cấu hình Biểu thức CPU và Phạm vi Nhãn
 
 Trích đoạn rule CPU:
 
@@ -1540,6 +1544,8 @@ groups:
 ```
 
 Trích đoạn chỉ minh họa một trong năm rule, không thay thế file đầy đủ. CPU được tổng hợp theo `instance`; các rule còn lại giữ nhãn từ biểu thức đầu vào, bao gồm nhãn thiết bị khi có. Cấu hình giả định mỗi Node Exporter chỉ được scrape một lần. Công thức đĩa dùng `free_bytes`, không phải `avail_bytes`; dung lượng còn trống dành riêng cho hệ thống vì vậy vẫn được tính là còn trống.
+
+### 3.3. Khai báo File Rule và Nạp lại Cấu hình Prometheus
 
 Trên VM Monitoring, file đầy đủ được đồng bộ vào `/etc/prometheus/recording_rules.yml` sau khi sao lưu và đối chiếu các rule đang sử dụng. Mục `rule_files` trong cấu hình Prometheus tham chiếu file này cùng các file rule hiện có:
 
@@ -1559,9 +1565,11 @@ sudo kill -HUP "$(systemctl show -p MainPID --value prometheus)"
 
 Các lệnh áp dụng cho dịch vụ systemd tên `prometheus`. Quy trình sao lưu, đồng bộ và kiểm tra API được trình bày trong [tài liệu Recording Rules](extension_docs/recording_rules.md).
 
+### 3.4. Tái sử dụng Metric trong Dashboard và Cảnh báo
+
 Panel CPU trong Grafana sử dụng `instance:cpu_usage:percent{instance="192.168.122.38:9100"}`; các panel RAM và đĩa sử dụng metric tương ứng với đơn vị phần trăm. Alert `HighCPUUsage` trong `configs/prometheus/alert_rules.yml` đã tham chiếu `instance:cpu_usage:percent > 80` và yêu cầu duy trì điều kiện trong `1m`. Các alert RAM và đĩa cũng tham chiếu metric tính sẵn.
 
-### 1.4. Phương pháp kiểm chứng
+## 4. Kịch bản Kiểm chứng Dữ liệu và Đánh giá Hiệu năng Truy vấn
 
 | Nội dung | Tiêu chí đánh giá | Minh chứng cần thu thập |
 |---|---|---|
@@ -1576,7 +1584,7 @@ Kịch bản tạo tải sử dụng `stress-ng --cpu "$(nproc)" --cpu-load 100 
 
 Các tiêu chí trên là kế hoạch kiểm chứng, chưa phải kết quả thực nghiệm. Kiểm tra cú pháp không chứng minh rule có dữ liệu; `health: ok` vẫn cần được đối chiếu với kết quả truy vấn. Chưa có dữ liệu đo kèm theo để công bố mức tăng tốc hoặc tỷ lệ tiết kiệm CPU, I/O.
 
-### 1.5. Giá trị giải quyết và giới hạn
+## 5. Đánh giá Khả năng Tái sử dụng và Giới hạn của Recording Rules
 
 Recording Rules cung cấp một nơi quản lý công thức và tập metric dùng chung cho dashboard và alert. Cơ chế tính định kỳ giúp giảm nhu cầu tính lại biểu thức gốc ở phía truy vấn; mức cải thiện phụ thuộc độ phức tạp biểu thức, số chuỗi thời gian và tần suất truy cập.
 
@@ -1595,6 +1603,6 @@ Hệ thống giám sát được trình bày theo các nhóm nội dung sau:
 6. **Phần VI (Optimization):** Trình bày kiểm soát cardinality, tái sử dụng kết quả truy vấn, giám sát Golden Signals và cấu hình TSDB.
 7. **Phần VII (GitOps & Monitoring as Code):** Trình bày quản lý cấu hình bằng Git, Grafana Provisioning, File SD và quy trình đồng bộ, nạp lại cấu hình.
 
-8. **Phần VIII (Phần mở rộng):** Chuẩn hóa truy vấn bằng Recording Rules; xác định cấu hình, tiêu chí kiểm chứng và giới hạn áp dụng.
+8. **Phần VIII (Recording Rules):** Chuẩn hóa truy vấn bằng Recording Rules; xác định cấu hình, tiêu chí kiểm chứng và giới hạn áp dụng.
 
 Mô hình cung cấp cơ sở thử nghiệm các cơ chế giám sát trên Linux. Khả năng áp dụng vào môi trường vận hành thực tế cần được đánh giá thêm về tải, tính sẵn sàng, bảo mật và quy trình khôi phục.
