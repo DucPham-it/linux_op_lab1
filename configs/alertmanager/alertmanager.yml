@@ -1,0 +1,28 @@
+global:
+  resolve_timeout: 5m
+
+templates:
+  - '/etc/alertmanager/alert.tmpl'
+
+route:
+  group_by: ['alertname', 'instance']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 2h
+  receiver: 'telegram-notifications'
+
+inhibit_rules:
+  - source_match:
+      alertname: 'InstanceDown'
+    target_match_re:
+      alertname: 'HighCPUUsage|HostHighCpuLoad|HostOutOfMemory|HostOutOfDiskSpace'
+    equal: ['instance']
+
+receivers:
+  - name: 'telegram-notifications'
+    telegram_configs:
+      - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
+        chat_id: -1001234567890
+        parse_mode: 'HTML'
+        message: '{{ template "telegram.html" . }}'
+        send_resolved: true

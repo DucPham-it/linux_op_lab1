@@ -1,0 +1,17 @@
+{{ define "telegram.html" }}
+{{ if eq .Status "firing" }}
+🔥 <b>[CẢNH BÁO PHÁT HIỆN]</b> ({{ .Alerts.Firing | len }} cảnh báo)
+{{ else }}
+✅ <b>[SỰ CỐ ĐÃ KHẮC PHỤC]</b> ({{ .Alerts.Resolved | len }} cảnh báo)
+{{ end }}
+
+{{ range .Alerts }}
+────────────────────────
+<b>Tiêu đề:</b> <code>{{ .Annotations.summary }}</code>
+<b>Mức độ:</b> <code>{{ .Labels.severity | toUpper }}</code>
+<b>Mục tiêu:</b> <code>{{ .Labels.instance }}</code>
+<b>Môi trường:</b> <code>{{ .Labels.environment }}</code>
+<b>Chi tiết:</b> {{ .Annotations.description }}
+<b>Thời điểm:</b> <i>{{ (.StartsAt.Add 25200000000000).Format "15:04:05 02/01/2006" }} (GMT+7)</i>
+{{ end }}
+{{ end }}

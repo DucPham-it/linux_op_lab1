@@ -1,0 +1,18 @@
+groups:
+  - name: linux_host_recording_rules
+    interval: 5s
+    rules:
+      - record: instance:cpu_usage:percent
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+
+      - record: instance:memory_usage:percent
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100
+
+      - record: instance:root_disk_usage:percent
+        expr: ((node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"} - node_filesystem_free_bytes{mountpoint="/",fstype!="rootfs"}) / node_filesystem_size_bytes{mountpoint="/",fstype!="rootfs"}) * 100
+
+      - record: instance:network_receive_bytes:rate1m
+        expr: rate(node_network_receive_bytes_total{device!~"lo|docker.*|veth.*"}[1m])
+
+      - record: instance:network_transmit_bytes:rate1m
+        expr: rate(node_network_transmit_bytes_total{device!~"lo|docker.*|veth.*"}[1m])
