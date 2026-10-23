@@ -2,43 +2,148 @@
 marp: true
 theme: default
 paginate: true
-header: "Chuyên đề Mở rộng: HA & LTS · Security & Auth · GitOps & MaC"
+header: "Mở rộng: Recording Rules · HA & LTS · Security · GitOps"
 footer: "Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO | Nginx"
 ---
 
 # BÁO CÁO CÁC CHUYÊN ĐỀ MỞ RỘNG
 ## Giám sát Hạ tầng Linux Chuẩn Enterprise
-### High Availability & LTS · Security & Auth · GitOps & MaC
+### Recording Rules · HA & LTS · Security & Auth · GitOps & MaC
 
 **Môi trường:** KVM/libvirt · Debian 12 Minimal Cloud  
 **Node:** `mon-server` (192.168.122.54) & `mon-target` (192.168.122.38)
 
 ---
 
-## MỤC TIÊU 3 CHUYÊN ĐỀ MỞ RỘNG
+## MỤC TIÊU 4 CHUYÊN ĐỀ MỞ RỘNG
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                      3 TRỤ CỘT NÂNG CẤP HỆ THỐNG                       │
-├────────────────────┬────────────────────┬──────────────────────────────┤
-│ 1. HA & LƯU TRỮ    │ 2. AN NINH & AUTH  │ 3. GITOPS & TỰ ĐỘNG HÓA      │
-│ (ha_longterm.md)   │ (security_auth.md) │ (gitops_monitoring_code.md)  │
-├────────────────────┼────────────────────┼──────────────────────────────┤
-│ • Không còn SPOF   │ • Mã hóa TLS 1.3   │ • Xóa bỏ thảm họa ClickOps   │
-│ • Khử trùng Alert  │ • Web Basic Auth   │ • Grafana Provisioning       │
-│ • Thanos + MinIO   │ • Grafana RBAC/SSO │ • File Service Discovery     │
-│ • Lưu trữ vĩnh viễn│ • Tường lửa UFW    │ • Pipeline deploy_stack.sh   │
-└────────────────────┴────────────────────┴──────────────────────────────┘
-```
+| Chuyên đề | Vấn đề | Giải pháp |
+|---|---|---|
+| **1. Recording Rules** | Lặp công thức, khó bảo trì | Metric tính sẵn dùng chung |
+| **2. HA & Lưu trữ** | Đơn điểm lỗi, giới hạn lưu trữ | HA Replicas · Thanos · MinIO |
+| **3. Security & Auth** | Dữ liệu và dịch vụ thiếu bảo vệ | TLS · Xác thực · Phân quyền |
+| **4. GitOps & MaC** | Cấu hình thủ công, khó kiểm soát | Cấu hình bằng mã · Kiểm tra trước triển khai |
 
 ---
 
-# PHẦN 1: TÍNH SẴN SÀNG CAO & LƯU TRỮ DÀI HẠN
+# PHẦN 1: CHUẨN HÓA TRUY VẤN VỚI RECORDING RULES
+### Tính sẵn metric · Tái sử dụng cho dashboard và cảnh báo
+
+---
+
+## 1.1. Vấn đề tồn đọng và phương pháp lựa chọn
+
+- **Tính toán lặp:** Dashboard và alert cùng đánh giá các biểu thức CPU, RAM, đĩa.
+- **Khó bảo trì:** Công thức nằm ở nhiều vị trí; thay đổi dễ thiếu hoặc lệch cách tính.
+- **Giải pháp lựa chọn:** Recording Rules có sẵn trong Prometheus; không thêm dịch vụ.
+
+```text
+Node Exporter → Metric gốc trong TSDB
+                          ↓
+               Recording Rules mỗi 5 giây
+                          ↓
+               Metric tính sẵn trong TSDB
+                     ↙           ↘
+                 Grafana     Alerting Rules
+```
+
+**Mục tiêu:** Tập trung công thức, dùng chung kết quả thay vì lặp PromQL.
+
+---
+
+## 1.2. Thiết kế và cấu hình Recording Rules
+
+**File:** `configs/prometheus/recording_rules.yml` — trích rule CPU:
+
+```yaml
+groups:
+  - name: linux_host_recording_rules
+    interval: 5s
+    rules:
+      - record: instance:cpu_usage:percent
+        expr: |
+          100 - (avg by (instance) (
+            rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+```
+
+- **5 rule:** CPU, RAM, đĩa, tốc độ mạng nhận và gửi.
+- **`record` / `expr`:** Tên metric đầu ra / công thức tính.
+- **`5s` / `[1m]`:** Chu kỳ đánh giá / cửa sổ dữ liệu tính tốc độ CPU.
+
+---
+
+## 1.3. Tích hợp Grafana và cảnh báo
+
+| Chỉ số | Metric dùng chung |
+|---|---|
+| CPU | `instance:cpu_usage:percent` |
+| RAM | `instance:memory_usage:percent` |
+| Đĩa gốc | `instance:root_disk_usage:percent` |
+
+**Grafana:** Lọc target bằng `{instance="192.168.122.38:9100"}`; đơn vị `%`.
+
+**Alert CPU hiện có — trích điều kiện:**
+
+```yaml
+expr: instance:cpu_usage:percent > 80
+for: 1m
+```
+
+**Phân biệt:** Recording Rule lưu metric; Alerting Rule kiểm tra ngưỡng;
+Alertmanager gửi thông báo. `for: 1m` là thời gian duy trì điều kiện.
+
+---
+
+## 1.4. Nạp cấu hình và kiểm tra thực thi
+
+**Trên VM Monitoring:** Sao lưu, đồng bộ file rule vào `/etc/prometheus/`.
+Bổ sung vào `rule_files` hiện có, giữ nguyên các file khác:
+
+```yaml
+rule_files:
+  - "/etc/prometheus/recording_rules.yml"
+  - "/etc/prometheus/alert_rules.yml"
+```
+
+**Chỉ nạp lại khi kiểm tra thành công:**
+
+```bash
+promtool check rules /etc/prometheus/recording_rules.yml
+promtool check config /etc/prometheus/prometheus.yml
+sudo kill -HUP "$(systemctl show -p MainPID --value prometheus)"
+```
+
+**Xác nhận:** `/api/v1/rules?type=record` có 5 rule `health: ok`;
+truy vấn metric trả dữ liệu đúng target. Cú pháp hợp lệ chưa đủ.
+
+---
+
+## 1.5. Demo, giá trị giải quyết và giới hạn
+
+**Tạo tải CPU trên VM Target thử nghiệm:**
+
+```bash
+stress-ng --cpu "$(nproc)" --cpu-load 100 --timeout 180s
+```
+
+| Kiểm chứng | Kết quả kỳ vọng |
+|---|---|
+| Đối chiếu metric CPU và công thức gốc | Khớp tại cùng timestamp đánh giá rule |
+| Quan sát Grafana khi tạo tải / kết thúc | CPU tăng / giảm; lưu được diễn biến |
+| CPU > 80% liên tục 1 phút | Alert chuyển Firing; Alertmanager xử lý |
+
+- **Giải quyết:** Công thức tập trung, kết quả nhất quán, giảm tính toán lặp ở truy vấn.
+- **Đánh đổi:** Thêm chi phí tính/lưu trữ; không tự tạo lịch sử trước khi bật.
+- **Chưa có benchmark:** Không kết luận mức tăng tốc; ưu tiên khả năng bảo trì.
+
+---
+
+# PHẦN 2: TÍNH SẴN SÀNG CAO & LƯU TRỮ DÀI HẠN
 ### High Availability (HA) & Long-Term Storage (LTS)
 
 ---
 
-## 1.1. Thách thức của Prometheus Local TSDB
+## 2.1. Thách thức của Prometheus Local TSDB
 
 * **Bản chất Local-First:** Dữ liệu time-series lưu cục bộ trong các block 2h kết hợp Write-Ahead Log (WAL).
 * **3 Rủi ro nghiêm trọng khi lên Production:**
@@ -48,7 +153,7 @@ footer: "Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO | Nginx
 
 ---
 
-## 1.2. Chiến lược Tối ưu hóa Local TSDB
+## 2.2. Chiến lược Tối ưu hóa Local TSDB
 
 Trước khi lên HA/Cloud, tối ưu tối đa ổ cứng cục bộ:
 
@@ -65,7 +170,7 @@ Trước khi lên HA/Cloud, tối ưu tối đa ổ cứng cục bộ:
 
 ---
 
-## 1.3. Kiến trúc Dual-Instance Active-Active
+## 2.3. Kiến trúc Dual-Instance Active-Active
 
 * **Nguyên lý:** Chạy 2 bản sao độc lập cùng cào (scrape) từ `mon-target:9100`.
   - `Prometheus A` (Replica 1): Cổng `9090` (external_label: `replica="prometheus-a"`).
@@ -83,7 +188,7 @@ Trước khi lên HA/Cloud, tối ưu tối đa ổ cứng cục bộ:
 
 ---
 
-## 1.4. Lưu trữ Dài hạn (LTS) với Thanos & MinIO
+## 2.4. Lưu trữ Dài hạn (LTS) với Thanos & MinIO
 
 ```text
 ┌──────────────────────┐   ┌──────────────────────┐
@@ -111,7 +216,7 @@ Trước khi lên HA/Cloud, tối ưu tối đa ổ cứng cục bộ:
 
 ---
 
-## 1.5. Demo & So sánh Giải pháp Lưu trữ
+## 2.5. Demo & So sánh Giải pháp Lưu trữ
 
 * **Kịch bản Demo HA Failover:**
   - Chạy `stress-ng` trên `mon-target` ➔ Alert `HighCPUUsage` chuyển sang FIRING.
@@ -127,12 +232,12 @@ Trước khi lên HA/Cloud, tối ưu tối đa ổ cứng cục bộ:
 
 ---
 
-# PHẦN 2: BẢO MẬT & QUẢN LÝ QUYỀN TRUY CẬP
+# PHẦN 3: BẢO MẬT & QUẢN LÝ QUYỀN TRUY CẬP
 ### Security, TLS Encryption, Authentication & Access Control (RBAC)
 
 ---
 
-## 2.1. Mô hình Đe dọa (Threat Model) Hệ thống Giám sát
+## 3.1. Mô hình Đe dọa (Threat Model) Hệ thống Giám sát
 
 Hạ tầng monitoring mặc định thường chạy **HTTP bản rõ** với 4 lỗ hổng chí mạng:
 
@@ -143,7 +248,7 @@ Hạ tầng monitoring mặc định thường chạy **HTTP bản rõ** với 4
 
 ---
 
-## 2.2. Mã hóa Đường truyền: Nginx TLS Reverse Proxy
+## 3.2. Mã hóa Đường truyền: Nginx TLS Reverse Proxy
 
 * **Nginx làm SSL Termination tập trung:**
   - Tạo chứng chỉ OpenSSL RSA 2048-bit, bắt buộc giao thức `TLSv1.2` và `TLSv1.3`.
@@ -166,7 +271,7 @@ Trình duyệt / Client (HTTPS:443 - TLS 1.3)
 
 ---
 
-## 2.3. Xác thực Basic Auth (bcrypt) & Phân quyền RBAC
+## 3.3. Xác thực Basic Auth (bcrypt) & Phân quyền RBAC
 
 * **Native Web Basic Auth trên Prometheus & Node Exporter:**
   - Dùng thuật toán băm an toàn: `htpasswd -B -C 10 /etc/prometheus/web_auth.htpasswd admin`.
@@ -187,7 +292,7 @@ Trình duyệt / Client (HTTPS:443 - TLS 1.3)
 
 ---
 
-## 2.4. Khóa Admin API & Cô lập Tường lửa UFW
+## 3.4. Khóa Admin API & Cô lập Tường lửa UFW
 
 * **Vô hiệu hóa TSDB Admin API:**
   - Tuyệt đối **loại bỏ cờ `--web.enable-admin-api`** khỏi service systemd.
@@ -205,7 +310,7 @@ Trình duyệt / Client (HTTPS:443 - TLS 1.3)
 
 ---
 
-## 2.5. Kịch bản Demo Kiểm chứng An ninh
+## 3.5. Kịch bản Demo Kiểm chứng An ninh
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -226,12 +331,12 @@ Trình duyệt / Client (HTTPS:443 - TLS 1.3)
 
 ---
 
-# PHẦN 3: GITOPS & MONITORING AS CODE
+# PHẦN 4: GITOPS & MONITORING AS CODE
 ### Declarative Provisioning, File SD & Pipeline Triển khai
 
 ---
 
-## 3.1. Thảm họa "ClickOps" vs. Triết lý GitOps
+## 4.1. Thảm họa "ClickOps" vs. Triết lý GitOps
 
 * **Thảm họa Vận hành Thủ công (ClickOps):**
   - Bấm chuột cấu hình Datasource, vẽ Panel, chỉnh sửa ngưỡng alert trên Web UI.
@@ -247,7 +352,7 @@ Git Repository ──► Code Review ──► promtool check ──► Hot-Relo
 
 ---
 
-## 3.2. Grafana Provisioning (Datasource & Dashboard as Code)
+## 4.2. Grafana Provisioning (Datasource & Dashboard as Code)
 
 Tự động nạp cấu hình từ `/etc/grafana/provisioning/` mỗi khi khởi động:
 
@@ -276,7 +381,7 @@ Tự động nạp cấu hình từ `/etc/grafana/provisioning/` mỗi khi khở
 
 ---
 
-## 3.3. Prometheus File-based Service Discovery (File SD)
+## 4.3. Prometheus File-based Service Discovery (File SD)
 
 * **Nhược điểm của `static_configs`:** Thêm/sửa IP máy chủ mục tiêu phải mở file `prometheus.yml` và restart dịch vụ ➔ Rủi ro cú pháp làm sập monitoring.
 * **Cơ chế File SD (`file_sd_configs`):**
@@ -294,7 +399,7 @@ Tự động nạp cấu hình từ `/etc/grafana/provisioning/` mỗi khi khở
 
 ---
 
-## 3.4. Pipeline Triển khai Tự động (`deploy_stack.sh`)
+## 4.4. Pipeline Triển khai Tự động (`deploy_stack.sh`)
 
 Script [deploy_stack.sh](file:///home/archlinux/Projects/Linux/Seminar/linux_op_lab1/scripts/deploy_stack.sh) thực thi quy trình CI/CD cục bộ an toàn qua 5 bước:
 
@@ -321,7 +426,7 @@ sudo systemctl restart grafana-server
 
 ---
 
-## 3.5. Demo Thực tế & So sánh Vận hành
+## 4.5. Demo Thực tế & So sánh Vận hành
 
 * **Demo 1: Tái sinh Grafana sau Thảm họa (Disaster Recovery):**
   - *Thao tác:* Dừng Grafana, xóa vĩnh viễn SQLite database (`rm -f /var/lib/grafana/grafana.db`), khởi động lại.
@@ -339,6 +444,8 @@ sudo systemctl restart grafana-server
 ---
 
 # TỔNG KẾT & BÀI HỌC KINH NGHIỆM
+
+* **Recording Rules ([recording_rules.md](../extension_docs/recording_rules.md)):** Tập trung công thức, tạo metric tính sẵn dùng chung cho dashboard và alert; ưu tiên tính nhất quán và khả năng bảo trì.
 
 * **HA & LTS ([ha_longterm_storage.md](../extension_docs/ha_longterm_storage.md)):** Loại bỏ SPOF với Active-Active Replicas, khử trùng lặp cảnh báo thông minh, mở rộng lưu trữ vô hạn với Thanos + MinIO S3.
 * **Security & Auth ([security_and_auth.md](../extension_docs/security_and_auth.md)):** Thiết lập phòng thủ đa tầng: Mã hóa TLS 1.3, xác thực Native Basic Auth, phân quyền Grafana RBAC, khóa Admin API và cô lập mạng bằng UFW.
