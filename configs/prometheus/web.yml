@@ -1,0 +1,4 @@
+# Prometheus Native Basic Authentication Configuration
+# Hash format: bcrypt (generated via: htpasswd -B -C 10 -c /etc/prometheus/web_auth.htpasswd admin)
+basic_auth_users:
+  admin: "$2y$10$gQk819D234eM91J.K36Z8uQfCZbFk09M6gM20R9yVp6c1e9x81iW."

@@ -1,0 +1,28 @@
+#cloud-config
+hostname: mon-node
+manage_etc_hosts: true
+
+users:
+  - name: debian
+    gecos: Debian System User
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG5kZ8yJ6L6K6E... archlinux@host
+
+timezone: Asia/Ho_Chi_Minh
+package_update: true
+package_upgrade: false
+
+packages:
+  - qemu-guest-agent
+  - curl
+  - wget
+  - htop
+  - net-tools
+  - ufw
+  - stress-ng
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent

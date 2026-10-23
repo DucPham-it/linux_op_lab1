@@ -1,0 +1,7 @@
+type: S3
+config:
+  bucket: "thanos-lts"
+  endpoint: "127.0.0.1:9000"
+  insecure: true
+  access_key: "minioadmin"
+  secret_key: "MinioStrongPassword2026!"

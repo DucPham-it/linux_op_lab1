@@ -1,0 +1,4 @@
+# Node Exporter Native Basic Authentication Configuration
+# Hash format: bcrypt (generated via htpasswd -B -C 10)
+basic_auth_users:
+  scraper: "$2y$10$tZ2zV9tF3oIqK8Y8eB7iLuR5F2sZ1u4yO4qY6a2b8wE0vT3yP7q4K"

@@ -1,0 +1,53 @@
+groups:
+  - name: linux_host_alerts
+    interval: 5s
+    rules:
+      - alert: HighCPUUsage
+        expr: instance:cpu_usage:percent > 80
+        for: 1m
+        labels:
+          severity: warning
+          tier: node
+        annotations:
+          summary: "Tải CPU cao trên {{ $labels.instance }}"
+          description: "Mức sử dụng CPU đạt {{ $value | printf \"%.2f\" }}% (> 80%) liên tục trong hơn 1 phút."
+
+      - alert: HostHighCpuLoad
+        expr: (node_load5 / count without (cpu, mode) (node_cpu_seconds_total{mode="system"})) > 1.5
+        for: 2m
+        labels:
+          severity: warning
+          tier: node
+        annotations:
+          summary: "Tải CPU Load Average 5m cao trên {{ $labels.instance }}"
+          description: "Chỉ số Load Average 5 phút trên mỗi lõi CPU đạt {{ $value | printf \"%.2f\" }} (> 1.5)."
+
+      - alert: HostOutOfMemory
+        expr: instance:memory_usage:percent > 85
+        for: 1m
+        labels:
+          severity: critical
+          tier: node
+        annotations:
+          summary: "Cạn kiệt bộ nhớ RAM trên {{ $labels.instance }}"
+          description: "Mức sử dụng RAM thực tế đạt {{ $value | printf \"%.2f\" }}% (> 85%) liên tục trong hơn 1 phút."
+
+      - alert: HostOutOfDiskSpace
+        expr: instance:root_disk_usage:percent > 85
+        for: 2m
+        labels:
+          severity: critical
+          tier: storage
+        annotations:
+          summary: "Phân vùng root gần đầy trên {{ $labels.instance }}"
+          description: "Dung lượng phân vùng root (/) đã chiếm {{ $value | printf \"%.2f\" }}% (> 85%)."
+
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: availability
+        annotations:
+          summary: "Mất kết nối tới mục tiêu giám sát {{ $labels.instance }}"
+          description: "Prometheus không thể cào dữ liệu từ {{ $labels.instance }} trong hơn 1 phút. Kiểm tra dịch vụ node_exporter hoặc trạng thái mạng."

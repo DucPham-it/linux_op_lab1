@@ -1,0 +1,10 @@
+[
+  {
+    "targets": ["192.168.122.38:9100"],
+    "labels": {
+      "environment": "production",
+      "role": "metrics-agent",
+      "hostname": "mon-target"
+    }
+  }
+]
