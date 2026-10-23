@@ -356,3 +356,15 @@ curl -s -X POST http://localhost:9090/-/reload
 # Kiểm tra các cổng đang lắng nghe trên máy chủ
 sudo ss -tulpn | grep -E '3000|9090|9091|9093|9100'
 ```
+
+DEMO 1: dashboard display + PromQL queries
+
+https://github.com/user-attachments/assets/c3cd7915-c8a8-466c-9734-94346a6dfc5c
+
+DEMO 2: stress test
+
+
+https://github.com/user-attachments/assets/7836600e-95f8-4db0-a208-876633be8bd2
+
+
+
