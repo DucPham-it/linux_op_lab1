@@ -340,9 +340,9 @@ sudo systemctl restart grafana-server
 
 # TỔNG KẾT & BÀI HỌC KINH NGHIỆM
 
-* **HA & LTS ([ha_longterm_storage.md](../extension/ha_longterm_storage.md)):** Loại bỏ SPOF với Active-Active Replicas, khử trùng lặp cảnh báo thông minh, mở rộng lưu trữ vô hạn với Thanos + MinIO S3.
-* **Security & Auth ([security_and_auth.md](../extension/security_and_auth.md)):** Thiết lập phòng thủ đa tầng: Mã hóa TLS 1.3, xác thực Native Basic Auth, phân quyền Grafana RBAC, khóa Admin API và cô lập mạng bằng UFW.
-* **GitOps & MaC ([gitops_monitoring_as_code.md](../extension/gitops_monitoring_as_code.md)):** Chuyển dịch toàn diện từ ClickOps sang Monitoring-as-Code: Tự động hóa cấp phát với Grafana Provisioning & File SD, kiểm thử cú pháp an toàn qua script one-click.
+* **HA & LTS ([ha_longterm_storage.md](../extension_docs/ha_longterm_storage.md)):** Loại bỏ SPOF với Active-Active Replicas, khử trùng lặp cảnh báo thông minh, mở rộng lưu trữ vô hạn với Thanos + MinIO S3.
+* **Security & Auth ([security_and_auth.md](../extension_docs/security_and_auth.md)):** Thiết lập phòng thủ đa tầng: Mã hóa TLS 1.3, xác thực Native Basic Auth, phân quyền Grafana RBAC, khóa Admin API và cô lập mạng bằng UFW.
+* **GitOps & MaC ([gitops_monitoring_as_code.md](../extension_docs/gitops_monitoring_as_code.md)):** Chuyển dịch toàn diện từ ClickOps sang Monitoring-as-Code: Tự động hóa cấp phát với Grafana Provisioning & File SD, kiểm thử cú pháp an toàn qua script one-click.
 
 ---
 

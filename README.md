@@ -13,15 +13,14 @@ Projects/Linux/Seminar/linux_op_lab1/
 ├── README.md                      # Hướng dẫn triển khai, kiểm thử và tổng quan hệ thống
 ├── report.md                      # Báo cáo toàn diện đồ án (Lý thuyết, Setup, Demo, Mở rộng)
 ├── theory.md                      # Nền tảng lý thuyết cốt lõi (Pull vs Push, TSDB, Metrics, rate)
-├── seminar.md                     # Tài liệu tổng hợp lệnh tham chiếu chi tiết
-├── recording_rules.md             # Chuyên đề tối ưu hóa PromQL và Recording Rules
 ├── slide/
 │   └── slide.md                   # Slide thuyết trình chuẩn Marp/Markdown Presentation
-├── extension/                     # Thư mục 4 chuyên đề nghiên cứu mở rộng nâng cao
+├── extension_docs/                # Thư mục 5 chuyên đề nghiên cứu mở rộng nâng cao
 │   ├── ha_longterm_storage.md     # Mở rộng 1: Tính sẵn sàng cao (HA Replicas) & Thanos + MinIO LTS
 │   ├── production_alerting.md     # Mở rộng 2: Cảnh báo chuyên nghiệp, triệt tiêu alert, Telegram
 │   ├── security_and_auth.md       # Mở rộng 3: Mã hóa TLS 1.3, Web Basic Auth (bcrypt), UFW Firewall
-│   └── gitops_monitoring_as_code.md # Mở rộng 4: Tự động hóa hạ tầng (Grafana Provisioning, File SD)
+│   ├── gitops_monitoring_as_code.md # Mở rộng 4: Tự động hóa hạ tầng (Grafana Provisioning, File SD)
+│   └── recording_rules.md         # Mở rộng 5: Tối ưu hóa PromQL và Recording Rules
 ├── configs/                       # Toàn bộ mã nguồn cấu hình (Monitoring-as-Code)
 │   ├── prometheus/                # prometheus.yml, recording_rules.yml, alert_rules.yml, targets/
 │   ├── alertmanager/              # alertmanager.yml, alert.tmpl (HTML Telegram template)
@@ -276,7 +275,7 @@ Chạy script tự động [scripts/demo_troubleshoot.sh](scripts/demo_troublesh
    sudo systemctl start grafana-server
    ```
 3. Mở lại trình duyệt `http://192.168.122.54:3000`:
-   - Dù cơ sở dữ liệu vừa bị xóa trắng, nhờ có **Provisioning**, toàn bộ Data Source Prometheus và Dashboard Linux Server tự động xuất hiện nguyên vẹn 100% trong chưa đầy 5 giây! Chi tiết xem tại [extension/gitops_monitoring_as_code.md](extension/gitops_monitoring_as_code.md).
+   - Dù cơ sở dữ liệu vừa bị xóa trắng, nhờ có **Provisioning**, toàn bộ Data Source Prometheus và Dashboard Linux Server tự động xuất hiện nguyên vẹn 100% trong chưa đầy 5 giây! Chi tiết xem tại [extension_docs/gitops_monitoring_as_code.md](extension_docs/gitops_monitoring_as_code.md).
 
 ---
 
@@ -304,7 +303,7 @@ Chạy script tự động [scripts/demo_troubleshoot.sh](scripts/demo_troublesh
 ---
 
 ### Mở rộng 3: Kiểm chứng Bảo mật TLS & Web Basic Auth
-Chi tiết xem tại [extension/security_and_auth.md](extension/security_and_auth.md).
+Chi tiết xem tại [extension_docs/security_and_auth.md](extension_docs/security_and_auth.md).
 1. **Kiểm tra ép HTTPS qua Nginx:**
    ```bash
    curl -I http://192.168.122.54/
@@ -324,7 +323,7 @@ Chi tiết xem tại [extension/security_and_auth.md](extension/security_and_aut
 ---
 
 ### Mở rộng 4: Tính sẵn sàng cao (Active-Active HA Failover)
-Chi tiết xem tại [extension/ha_longterm_storage.md](extension/ha_longterm_storage.md).
+Chi tiết xem tại [extension_docs/ha_longterm_storage.md](extension_docs/ha_longterm_storage.md).
 1. Khởi chạy instance Prometheus thứ 2 trên cổng 9091:
    ```bash
    sudo prometheus --config.file=configs/prometheus/prometheus-replica.yml \
