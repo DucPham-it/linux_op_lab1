@@ -48,9 +48,9 @@ Hệ thống giám sát thu thập dữ liệu tài nguyên từ Node Exporter, 
 
 Với mô hình hai VM, chưa có cơ sở xác định truy vấn là điểm nghẽn hiệu năng. Tính nhất quán và khả năng bảo trì là mục tiêu ưu tiên; mức tăng tốc phải được đánh giá bằng phép đo tương ứng.
 
-### 1.2. Phương pháp Mở rộng được Lựa chọn
+### 1.2. Phương pháp giải quyết với Recording Rules
 
-Nhóm lựa chọn Recording Rules, chức năng có sẵn của Prometheus, để định kỳ tính toán biểu thức PromQL và lưu kết quả thành metric dùng chung. Giải pháp không bổ sung dịch vụ, tận dụng TSDB hiện có và phù hợp với kiến trúc giám sát đang triển khai.
+Với Recording Rules, chức năng có sẵn của Prometheus, để định kỳ tính toán biểu thức PromQL và lưu kết quả thành metric dùng chung. Giải pháp không bổ sung dịch vụ, tận dụng TSDB hiện có và phù hợp với kiến trúc giám sát đang triển khai.
 
 Việc chỉ rút gọn truy vấn tại từng panel không tập trung được công thức giữa dashboard và alert. Recording Rules giải quyết yêu cầu này bằng cách đưa công thức về một nơi quản lý, trong khi các thành phần sử dụng cùng tên metric đầu ra.
 
@@ -255,7 +255,6 @@ curl -sG http://localhost:9090/api/v1/query \
 
 **Kết quả kỳ vọng:** Target có `up = 1`; nhóm `linux_host_recording_rules` chứa năm rule có `health: ok`, không có lỗi đánh giá; các truy vấn CPU, RAM và đĩa trả dữ liệu đúng instance.
 
-**Minh chứng:** Phản hồi API Rules, giá trị metric và timestamp truy vấn. Cú pháp hợp lệ hoặc `health: ok` chưa đủ chứng minh có dữ liệu. Nếu vector rỗng, cần kiểm tra target, metric gốc, nhãn lọc và số mẫu đầu vào của `rate`.
 
 ### Demo 2: Đối chiếu Công thức và Quan sát CPU khi Tạo tải
 
@@ -280,7 +279,6 @@ stress-ng --cpu "$(nproc)" --cpu-load 100 --timeout 180s
 
 **Kết quả kỳ vọng:** Hai cách tính CPU khớp tại cùng timestamp đánh giá; CPU tăng khi có tải, giảm sau khi kết thúc; các mẫu của giai đoạn có tải vẫn xuất hiện trong lịch sử.
 
-**Minh chứng:** Giá trị đối chiếu có timestamp và ảnh biểu đồ kèm thời điểm tạo tải. Chỉ thực hiện trên VM thử nghiệm vì tải CPU có thể ảnh hưởng các tiến trình khác.
 
 ### Demo 3: Kiểm chứng Cảnh báo Sử dụng Metric Tính sẵn
 
@@ -293,7 +291,6 @@ stress-ng --cpu "$(nproc)" --cpu-load 100 --timeout 180s
 
 **Kết quả kỳ vọng:** Dashboard và alert sử dụng cùng nguồn metric; alert chuyển Firing khi đủ điều kiện. Việc nhận Telegram phụ thuộc cấu hình Alertmanager và dịch vụ nhận thông báo, không do Recording Rules trực tiếp bảo đảm.
 
-**Minh chứng:** Biểu thức alert, trạng thái Pending/Firing và thông báo nhận được nếu có.
 
 ### 5.1. Tổng hợp Tiêu chí Đánh giá và Minh chứng
 
