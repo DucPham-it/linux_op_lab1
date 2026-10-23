@@ -187,6 +187,7 @@ footer: "Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO | Nginx
 | **2. HA & Lưu trữ** | Đơn điểm lỗi, giới hạn lưu trữ | HA Replicas · Thanos · MinIO |
 | **3. Security & Auth** | Dữ liệu và dịch vụ thiếu bảo vệ | TLS · Xác thực · Phân quyền |
 | **4. GitOps & MaC** | Cấu hình thủ công, khó kiểm soát | Cấu hình bằng mã · Kiểm tra trước triển khai |
+| **5. Alertmanager** | Cảnh báo trùng lặp, khó định tuyến | Grouping · Routing · Telegram Notification |
 
 ---
 
@@ -607,6 +608,155 @@ sudo systemctl restart grafana-server
 
 ---
 
+# PHẦN 5: ĐIỀU PHỐI CẢNH BÁO VỚI ALERTMANAGER
+### Alert Routing · Grouping · Deduplication · Telegram
+
+---
+
+## 5.1. Vai trò trong kiến trúc Alerting
+
+- **Prometheus:** Đánh giá PromQL và phát hiện sự cố.
+- **Alertmanager:** Gom nhóm, định tuyến và quản lý thông báo.
+- **Telegram Bot:** Chuyển cảnh báo đến quản trị viên.
+
+```text
+Prometheus → Alertmanager → Telegram Bot
+ Detection      Routing       Notification
+```
+
+**Mục tiêu:** Giảm Alert Fatigue, tránh gửi thông báo không cần thiết và hỗ trợ phản ứng nhanh.
+
+---
+
+## 5.2. Cấu hình Routing và Telegram
+
+**File:** `/etc/alertmanager/alertmanager.yml`
+
+```yaml
+route:
+  group_by: ['alertname', 'instance', 'severity']
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 2h
+  receiver: 'telegram-bot'
+
+receivers:
+  - name: 'telegram-bot'
+    telegram_configs:
+      - bot_token: 'YOUR_BOT_TOKEN'
+        chat_id: YOUR_CHAT_ID
+        parse_mode: HTML
+        send_resolved: true
+        message: |
+          {{ range .Alerts }}
+          <b>{{ if eq .Status "firing" }}🔥 CẢNH BÁO{{ else }}✅ ĐÃ KHẮC PHỤC{{ end }}</b>
+          <b>Cảnh báo:</b> {{ .Annotations.summary }}
+          <b>Mức độ:</b> <code>{{ .Labels.severity }}</code>
+          <b>Đối tượng:</b> <code>{{ .Labels.instance }}</code>
+          <b>Chi tiết:</b> {{ .Annotations.description }}
+          <b>Bắt đầu:</b> <code>{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}</code>
+          {{ end }}
+```
+
+| Tham số | Chức năng |
+|---|---|
+| `group_by` | Gom alert theo nhãn |
+| `group_wait` | Chờ gom alert mới |
+| `group_interval` | Chờ trước khi gửi cập nhật nhóm |
+| `repeat_interval` | Nhắc lại alert chưa được giải quyết |
+| `send_resolved` | Cho phép gửi thông báo phục hồi |
+
+**Lưu ý:** Các khoảng thời gian này điều khiển việc gửi thông báo, không thay thế `scrape_interval`, `evaluation_interval` hay `for` của Prometheus.
+
+---
+
+## 5.3. Alerting Rules và luồng trạng thái
+
+**File:** `/etc/prometheus/alert_rules.yml`
+
+```yaml
+groups:
+  - name: WebServerInfrastructureAlerts
+    rules:
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes /
+          node_memory_MemTotal_bytes) * 100 > 80
+        for: 5s
+        labels:
+          severity: WARNING
+        annotations:
+          summary: "Cảnh báo dung lượng RAM!"
+          description: "RAM vượt ngưỡng 80%."
+```
+
+**Prometheus gửi alert đến Alertmanager:**
+
+```yaml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']
+
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+```
+
+- `expr`: Điều kiện phát hiện sự cố.
+- `for`: Thời gian điều kiện phải duy trì.
+- `labels`: Metadata để phân loại và định tuyến.
+- `annotations`: Nội dung hiển thị trong thông báo.
+
+**Luồng trạng thái:** `Inactive → Pending → Firing`; khi điều kiện hết đúng, alert được giải quyết và có thể gửi thông báo `RESOLVED`.
+
+---
+
+## 5.4. Demo kiểm chứng: RAM cao và phục hồi
+
+```bash
+sudo apt install -y python3-psutil stress
+python3 auto_stress.py 85 180
+```
+
+| Giai đoạn | Kết quả cần quan sát |
+|---|---|
+| RAM vượt 80% | Alert vào `PENDING` |
+| Điều kiện duy trì đủ `for: 5s` | Alert chuyển `FIRING` |
+| Alertmanager gửi thông báo | Telegram nhận nội dung cảnh báo |
+| `stress` kết thúc, RAM giảm | Alert được giải quyết nếu RAM xuống dưới ngưỡng |
+
+**Kiểm tra trước khi demo:**
+
+```bash
+promtool check rules /etc/prometheus/alert_rules.yml
+promtool check config /etc/prometheus/prometheus.yml
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
+**Giá trị:** Kiểm chứng chuỗi phát hiện → điều phối → Telegram → thông báo phục hồi.
+
+**Giới hạn:** `auto_stress.py` chỉ ước tính lượng RAM cần cấp phát; mức sử dụng thực tế có thể khác 85%. Theo dõi VM trong khi chạy để tránh OOM.
+
+---
+
+## 5.5. Troubleshooting và bảo mật
+
+| Vấn đề | Kiểm tra |
+|---|---|
+| Telegram không nhận tin | Bot Token, Chat ID, kết nối mạng |
+| Thiếu timestamp/nội dung | Go Template, `StartsAt`, `Annotations` |
+| Alert không `FIRING` | PromQL, `for`, `rule_files` |
+| Dịch vụ không khởi động | YAML, cổng 9093, log dịch vụ |
+| Không có tin phục hồi | `send_resolved: true` |
+
+```bash
+sudo journalctl -u alertmanager -n 100 --no-pager
+sudo ss -tulpn | grep -E '9090|9093'
+```
+
+**Bảo mật:** Không commit Bot Token hoặc mật khẩu thật lên Git; giới hạn quyền đọc file cấu hình và chỉ mở các cổng cần thiết.
+
+---
+
 # TỔNG KẾT & BÀI HỌC KINH NGHIỆM
 
 * **Recording Rules ([recording_rules.md](../extension_docs/recording_rules.md)):** Tập trung công thức, tạo metric tính sẵn dùng chung cho dashboard và alert; ưu tiên tính nhất quán và khả năng bảo trì.
@@ -614,6 +764,7 @@ sudo systemctl restart grafana-server
 * **HA & LTS ([ha_longterm_storage.md](../extension_docs/ha_longterm_storage.md)):** Loại bỏ SPOF với Active-Active Replicas, khử trùng lặp cảnh báo thông minh, mở rộng lưu trữ vô hạn với Thanos + MinIO S3.
 * **Security & Auth ([security_and_auth.md](../extension_docs/security_and_auth.md)):** Thiết lập phòng thủ đa tầng: Mã hóa TLS 1.3, xác thực Native Basic Auth, phân quyền Grafana RBAC, khóa Admin API và cô lập mạng bằng UFW.
 * **GitOps & MaC ([gitops_monitoring_as_code.md](../extension_docs/gitops_monitoring_as_code.md)):** Chuyển dịch toàn diện từ ClickOps sang Monitoring-as-Code: Tự động hóa cấp phát với Grafana Provisioning & File SD, kiểm thử cú pháp an toàn qua script one-click.
+* **Alertmanager ([alert.md](../extension_docs/alert.md)):** Điều phối cảnh báo qua Grouping, Deduplication và Routing; gửi Telegram với nội dung có ngữ cảnh, hỗ trợ thông báo phục hồi và kiểm chứng bằng kịch bản ép tải RAM.
 
 ---
 
