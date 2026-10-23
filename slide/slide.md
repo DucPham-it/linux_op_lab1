@@ -6,6 +6,170 @@ header: "Mở rộng: Recording Rules · HA & LTS · Security · GitOps"
 footer: "Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO | Nginx"
 ---
 
+# SLIDES PHẦN I: OVERVIEW — PROMETHEUS & GRAFANA MONITORING
+
+---
+
+## HƯỚNG DẪN CHO AI KHI SINH SLIDE PHẦN 1
+
+- **Ngôn ngữ:** Tiếng Việt, giữ nguyên thuật ngữ kỹ thuật tiếng Anh (Metrics, Logs, Traces, scrape, TSDB, WAL, Head Block...).
+- **Nguyên tắc nội dung:** Mỗi slide chỉ chứa **hình, bảng, công thức, từ khóa**. Tối đa 5 gạch đầu dòng, mỗi dòng không quá 8 từ.
+- **Sơ đồ:** ưu tiên vẽ thành hình (flowchart/diagram) thay vì chữ.
+- **Phong cách:** theo template chung của cả nhóm (màu, font, bố cục); không tự đặt phong cách riêng. Code dùng font monospace.
+- **Gộp slide:** nếu thời gian của Phần I eo hẹp, có thể gộp Slide 1 + 2 và Slide 3 + 4 (không cắt Slide 7).
+
+---
+
+## SLIDE 1 — Observability và 3 trụ cột
+
+**Ý tưởng slide:** Mở đầu bằng bài toán thực tế: hệ thống phân tán quá phức tạp để SSH từng máy đọc log. Giới thiệu Observability như lời giải, gồm 3 trụ cột.
+
+**Nội dung hiển thị trên slide:**
+- Tiêu đề: *Observability: nhìn vào bên trong hệ thống từ bên ngoài*
+- 3 cột/biểu tượng:
+  | Trụ cột | Câu hỏi trả lời |
+  |---|---|
+  | **Metrics** | Hệ thống đang khỏe hay yếu? (CPU, RAM, request/giây) |
+  | **Logs** | Chuyện gì đã xảy ra tại thời điểm đó? |
+  | **Traces** | Request đi qua những đâu, chậm ở đâu? |
+
+**Gợi ý hình ảnh:** 3 biểu tượng (biểu đồ đường, tờ giấy ghi chép, đường đi nhiều chặng) xếp ngang.
+
+---
+
+## SLIDE 2 — Metrics vs Logs
+
+**Ý tưởng slide:** Làm rõ hai trụ cột quan trọng nhất của đề tài, và chúng bổ trợ nhau chứ không thay thế nhau. Metrics để *phát hiện*, Logs để *điều tra*.
+
+**Nội dung hiển thị trên slide:**
+- Bảng so sánh rút gọn:
+  | Tiêu chí | Metrics | Logs |
+  |---|---|---|
+  | Bản chất | Số (Float64) + Labels + Timestamp | Chuỗi text / JSON |
+  | Mục đích | Phát hiện bất thường, cảnh báo | Điều tra nguyên nhân gốc (RCA) |
+  | Dung lượng | ~1–2 bytes/điểm đo | Vài chục MB đến GB/ngày |
+  | Truy vấn | Cực nhanh (PromQL) | Chậm hơn, cần full-text index |
+- Sơ đồ luồng (vẽ thành hình):
+  ```mermaid
+  flowchart LR
+      A["Hạ tầng & Ứng dụng"] -->|Metrics| B["Prometheus TSDB"]
+      A -->|Logs| C["Log Aggregator / Loki"]
+      B --> D["Alertmanager: báo động"]
+      B --> E["Grafana Dashboard"]
+      D --> F["Kỹ sư mở Grafana định vị Node lỗi"]
+      F --> C
+  ```
+
+---
+
+## SLIDE 3 — Vì sao cần giám sát
+
+**Ý tưởng slide:** Thuyết phục khán giả rằng giám sát không phải "làm cho có" mà mang lại giá trị vận hành rõ ràng. Dùng 4 từ khóa, mỗi từ khóa một biểu tượng.
+
+**Nội dung hiển thị trên slide:**
+1. **Chủ động** thay vì bị động
+2. Giảm **MTTD / MTTR**
+3. **Capacity Planning**
+4. **Root-Cause Analysis**
+
+**Gợi ý hình ảnh:** 4 ô vuông đều nhau, mỗi ô 1 biểu tượng + 1 từ khóa. Có thể thêm đường thời gian nhỏ minh họa MTTD → MTTR.
+
+---
+
+## SLIDE 4 — Vì sao chọn đề tài
+
+**Ý tưởng slide:** Giải thích lựa chọn Prometheus + Grafana dựa trên 3 lý do: phổ biến trong công nghiệp, kiến trúc Pull gọn nhẹ, và nhiều thách thức production để thực nghiệm.
+
+**Nội dung hiển thị trên slide:**
+- **Chuẩn công nghiệp:** CNCF graduated project (sau Kubernetes)
+- **Pull model:** server tự quyết định tần suất thu thập
+- **Thách thức production:** Alert Fatigue, HA + Long-term Storage, Recording Rules, Security, GitOps
+
+**Gợi ý hình ảnh:** logo Prometheus + Grafana + CNCF ở một góc; 3 mục xếp dọc.
+
+---
+
+## SLIDE 5 — Pull vs Push
+
+**Ý tưởng slide:** Giải thích điểm khác biệt kiến trúc cốt lõi của Prometheus. Dùng sơ đồ là chính, bảng chỉ giữ các tiêu chí đắt giá nhất.
+
+**Nội dung hiển thị trên slide:**
+- Sơ đồ 2 nửa:
+  ```mermaid
+  flowchart TD
+      subgraph Pull ["Pull - Prometheus"]
+          S1["Prometheus Server"] -->|HTTP GET /metrics định kỳ| T1["Node Exporter :9100"]
+          S1 -.->|Không phản hồi: up = 0| T1
+      end
+      subgraph Push ["Push - Graphite/Telegraf"]
+          A2["Push Agent"] -->|Gửi dữ liệu chủ động| S2["Central InfluxDB/Graphite"]
+      end
+  ```
+- Bảng rút gọn:
+  | Tiêu chí | Pull (Prometheus) | Push |
+  |---|---|---|
+  | Phát hiện máy sập | Scrape lỗi → `up = 0` | Khó phân biệt "agent chết" và "không có gì để gửi" |
+  | Debug | `curl http://target:9100/metrics` | Soi log từng agent |
+  | NAT / Firewall | Cần proxy nếu target nằm sâu trong mạng kín | Dễ đi qua vì agent mở kết nối ra ngoài |
+  | Batch job ngắn | Khó cào (dùng **Pushgateway**) | Rất phù hợp |
+
+---
+
+## SLIDE 6 — Bốn loại Metric
+
+**Ý tưởng slide:** Giúp khán giả phân biệt Counter, Gauge, Histogram, Summary để hiểu tại sao slide sau cần `rate()`.
+
+**Nội dung hiển thị trên slide:**
+- Ví dụ định dạng metric (hiển thị code):
+  ```text
+  # HELP node_cpu_seconds_total Seconds the CPUs spent in each mode.
+  # TYPE node_cpu_seconds_total counter
+  node_cpu_seconds_total{cpu="0",mode="idle"} 18452.73
+  ```
+  Chú thích 3 phần: **tên metric** · **labels** · **giá trị**
+- Bảng:
+  | Loại | Đặc điểm | Ví dụ |
+  |---|---|---|
+  | **Counter** | Chỉ tăng; reset về 0 khi restart | `node_cpu_seconds_total` |
+  | **Gauge** | Tăng giảm tự do | `node_memory_MemAvailable_bytes` |
+  | **Histogram** | Đếm theo bucket (`_bucket`, `_sum`, `_count`) | Độ trễ HTTP |
+  | **Summary** | Quantile tính sẵn phía client | Thời gian xử lý |
+
+---
+
+## SLIDE 7 — Vì sao Counter luôn cần `rate()`
+
+**Ý tưởng slide:** Đây là slide **quan trọng nhất** của Phần I vì gắn trực tiếp với Demo 2 (PromQL, bắt buộc có 1 câu dùng `rate()`). Dùng so sánh "sai vs đúng" để khán giả nhớ lâu.
+
+**Nội dung hiển thị trên slide:**
+- Công thức:
+  $$\text{rate}(V[t]) = \frac{\Delta V}{\Delta t}$$
+- Hai ô so sánh:
+  - ❌ **Sai:** `node_cpu_seconds_total{mode="idle"}` → ra con số khổng lồ (ví dụ 18452 giây)
+  - ✅ **Đúng:** `rate(node_cpu_seconds_total{mode="idle"}[1m])` → tốc độ tăng mỗi giây trong 1 phút
+- Ghi chú nhỏ: *`rate()` tự xử lý khi Counter reset về 0.*
+
+**Gợi ý hình ảnh:** đồ thị đường dốc lên liên tục (Counter thô) đặt cạnh đồ thị dao động quanh một mức (sau `rate()`).
+
+---
+
+## SLIDE 8 — Kiến trúc TSDB của Prometheus
+
+**Ý tưởng slide:** Cho khán giả thấy Prometheus lưu dữ liệu thế nào mà vừa nhanh vừa nhẹ. Dùng một sơ đồ luồng và một con số nổi bật.
+
+**Nội dung hiển thị trên slide:**
+- Sơ đồ luồng:
+  ```mermaid
+  flowchart TD
+      Scrape["Scrape: mẫu metric mới"] -->|1. Ghi tuần tự ra đĩa| WAL["WAL - Write-Ahead Log"]
+      Scrape -->|2. Nạp vào RAM| Head["Head Block - in-memory"]
+      Head -->|Compaction mỗi 2 giờ| Block["Block bất biến trên đĩa"]
+      Block --> Files["meta.json · chunks/ · index · tombstones"]
+  ```
+- Con số nổi bật (chữ lớn): **~1.37 bytes / sample**
+
+---
+
 # BÁO CÁO CÁC CHUYÊN ĐỀ MỞ RỘNG
 ## Giám sát Hạ tầng Linux Chuẩn Enterprise
 ### Recording Rules · HA & LTS · Security & Auth · GitOps & MaC
