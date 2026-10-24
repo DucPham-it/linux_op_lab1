@@ -1,0 +1,2687 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO | Nginx</title>
+  <meta name="description"
+    content="Báo cáo chuyên đề mở rộng: Recording Rules, HA & LTS, Security & Auth, GitOps & Monitoring-as-Code, Alertmanager" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-deep: #eef2f6;
+      --bg-slide: #ffffff;
+      --bg-card: #f8fafc;
+      --bg-code: #f6f8fa;
+      --accent: #cf222e;
+      --accent2: #0969da;
+      --accent3: #1a7f37;
+      --accent4: #8250df;
+      --accent5: #bc4c00;
+      --text-1: #1f2328;
+      --text-2: #57606a;
+      --border: #d0d7de;
+      --shadow: 0 10px 32px rgba(0, 0, 0, .08);
+      --slide-w: 1280px;
+      --slide-h: 720px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg-deep);
+      color: var(--text-1);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── Slideshow ── */
+    #slideshow {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .slide {
+      display: none;
+      width: var(--slide-w);
+      height: var(--slide-h);
+      background: var(--bg-slide);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      flex-direction: column;
+    }
+
+    .slide.active {
+      display: flex;
+      animation: fadeIn .22s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    /* ── Header / Footer ── */
+    .slide-header {
+      background: #f6f8fa;
+      border-bottom: 1px solid var(--border);
+      padding: 9px 32px;
+      font-size: 10.5px;
+      color: var(--text-2);
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+
+    .slide-footer {
+      background: #f6f8fa;
+      border-top: 1px solid var(--border);
+      padding: 7px 32px;
+      font-size: 10px;
+      color: var(--text-2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Body ── */
+    .slide-body {
+      flex: 1;
+      padding: 24px 44px 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .slide-body.center {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* ── Typography ── */
+    h1 {
+      font-size: 2.35rem;
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(135deg, var(--accent2), var(--accent4));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    h2 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--accent2);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 7px;
+    }
+
+    h3 {
+      font-size: .95rem;
+      font-weight: 500;
+      color: var(--text-2);
+      margin-top: -4px;
+    }
+
+    strong {
+      color: var(--text-1);
+      font-weight: 600;
+    }
+
+    ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    ul li {
+      font-size: .86rem;
+      line-height: 1.55;
+      padding-left: 18px;
+      position: relative;
+      color: var(--text-1);
+    }
+
+    ul li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--accent2);
+      font-size: .72rem;
+      top: 3px;
+    }
+
+    ul li ul {
+      margin-top: 3px;
+    }
+
+    ul li ul li {
+      font-size: .8rem;
+      color: var(--text-2);
+    }
+
+    ul li ul li::before {
+      content: '·';
+      color: var(--accent2);
+    }
+
+    /* ── Code ── */
+    pre,
+    code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    pre {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: .73rem;
+      line-height: 1.65;
+      color: #1f2328;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    code {
+      background: rgba(175, 184, 193, .2);
+      color: var(--accent5);
+      font-size: .82em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+      font-size: inherit;
+    }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .81rem;
+    }
+
+    thead th {
+      background: rgba(9, 105, 218, .08);
+      color: var(--accent2);
+      font-weight: 600;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 2px solid var(--accent2);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(0, 0, 0, .025);
+    }
+
+    tbody td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-1);
+      vertical-align: middle;
+    }
+
+    tbody td:first-child {
+      font-weight: 600;
+      color: var(--accent2);
+    }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: .73rem;
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+
+    .badge-green {
+      background: #dafbe1;
+      color: var(--accent3);
+      border: 1px solid #4ac26b;
+    }
+
+    .badge-blue {
+      background: #ddf4ff;
+      color: var(--accent2);
+      border: 1px solid #54aeff;
+    }
+
+    .badge-orange {
+      background: #fff8c5;
+      color: var(--accent5);
+      border: 1px solid #eac54f;
+    }
+
+    .badge-purple {
+      background: #fbefff;
+      color: var(--accent4);
+      border: 1px solid #c297ff;
+    }
+
+    .badge-red {
+      background: #ffebe9;
+      color: var(--accent);
+      border: 1px solid #ff8182;
+    }
+
+    /* ── Cards ── */
+    .cards {
+      display: grid;
+      gap: 10px;
+    }
+
+    .cards-2 {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .cards-3 {
+      grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .cards-4 {
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+    }
+
+    .cards-5 {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+    }
+
+    .card-icon {
+      font-size: 1.6rem;
+      margin-bottom: 2px;
+    }
+
+    .card-title {
+      font-size: .88rem;
+      font-weight: 700;
+      color: var(--text-1);
+    }
+
+    .card-text {
+      font-size: .76rem;
+      color: var(--text-2);
+      line-height: 1.5;
+    }
+
+    /* ── Two-column ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      flex: 1;
+    }
+
+    .two-col.r32 {
+      grid-template-columns: 3fr 2fr;
+    }
+
+    /* ── Compare boxes ── */
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .compare-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px 15px;
+    }
+
+    .compare-box.wrong {
+      background: #fff8f8;
+      border-color: rgba(207, 34, 46, .4);
+    }
+
+    .compare-box.right {
+      background: #f6fdf7;
+      border-color: rgba(26, 127, 55, .4);
+    }
+
+    .compare-box-title {
+      font-size: .84rem;
+      font-weight: 700;
+      margin-bottom: 7px;
+    }
+
+    .wrong .compare-box-title {
+      color: var(--accent);
+    }
+
+    .right .compare-box-title {
+      color: var(--accent3);
+    }
+
+    /* ── Pipeline flow ── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .flow-box {
+      background: #ffffff;
+      border: 1px solid var(--accent2);
+      border-radius: 8px;
+      padding: 7px 13px;
+      font-size: .76rem;
+      font-weight: 600;
+      color: var(--accent2);
+      white-space: nowrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+    }
+
+    .flow-arrow {
+      color: var(--accent5);
+      font-size: 1.1rem;
+    }
+
+    /* ── Section badge ── */
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(9, 105, 218, .1);
+      border: 1px solid rgba(9, 105, 218, .3);
+      border-radius: 30px;
+      padding: 5px 16px;
+      font-size: .78rem;
+      color: var(--accent2);
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    /* ── Big stat ── */
+    .big-stat {
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--accent3);
+      line-height: 1;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .big-stat-label {
+      font-size: .9rem;
+      color: var(--text-2);
+      margin-top: 4px;
+    }
+
+    /* ── Formula ── */
+    .formula {
+      background: rgba(130, 80, 223, .08);
+      border: 1px solid rgba(130, 80, 223, .25);
+      border-radius: 10px;
+      padding: 14px 22px;
+      text-align: center;
+      font-size: 1.25rem;
+      color: var(--accent4);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Colour helpers ── */
+    .text-blue {
+      color: var(--accent2) !important;
+    }
+
+    .text-green {
+      color: var(--accent3) !important;
+    }
+
+    .text-orange {
+      color: var(--accent5) !important;
+    }
+
+    .text-purple {
+      color: var(--accent4) !important;
+    }
+
+    .text-red {
+      color: var(--accent) !important;
+    }
+
+    .text-muted {
+      color: var(--text-2) !important;
+    }
+
+    /* ─────────────────────────────────────────
+       CSS DIAGRAM SYSTEM  (replaces ASCII art)
+    ───────────────────────────────────────── */
+    /* Generic node box */
+    .dn-node {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--text-1);
+      text-align: center;
+      white-space: nowrap;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+    }
+
+    .dn-node.blue {
+      border-color: var(--accent2);
+      color: var(--accent2);
+    }
+
+    .dn-node.green {
+      border-color: var(--accent3);
+      color: var(--accent3);
+    }
+
+    .dn-node.orange {
+      border-color: var(--accent5);
+      color: var(--accent5);
+    }
+
+    .dn-node.purple {
+      border-color: var(--accent4);
+      color: var(--accent4);
+    }
+
+    .dn-node.red {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .dn-node.dim {
+      border-color: var(--border);
+      color: var(--text-2);
+    }
+
+    .dn-node.wide {
+      min-width: 200px;
+    }
+
+    .dn-node.full {
+      width: 100%;
+    }
+
+    /* Arrow label */
+    .dn-label {
+      font-size: .68rem;
+      color: var(--text-2);
+      font-style: italic;
+    }
+
+    /* Vertical flow */
+    .dn-vflow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    .dn-vflow .dn-arr {
+      font-size: 1rem;
+      color: var(--text-2);
+      line-height: 1.4;
+    }
+
+    /* Horizontal flow */
+    .dn-hflow {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .dn-hflow .dn-arr {
+      font-size: 1rem;
+      color: var(--text-2);
+    }
+
+    /* Two parallel columns → merge */
+    .dn-parallel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .dn-merge {
+      display: flex;
+      justify-content: center;
+      margin-top: 4px;
+    }
+
+    /* Row of nodes */
+    .dn-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Group wrapper */
+    .dn-group {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+      background: #ffffff;
+    }
+
+    .dn-group-label {
+      position: absolute;
+      top: -10px;
+      left: 12px;
+      background: var(--bg-slide);
+      padding: 0 6px;
+      font-size: .68rem;
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    /* Whole diagram wrapper */
+    .dn {
+      background: var(--bg-code);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* ── Navigation ── */
+    #nav {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, .95);
+      border: 1px solid var(--border);
+      border-radius: 40px;
+      padding: 7px 14px;
+      backdrop-filter: blur(12px);
+      z-index: 1000;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, .1);
+    }
+
+    #nav button {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text-1);
+      border-radius: 8px;
+      padding: 5px 14px;
+      font-size: .8rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all .18s;
+    }
+
+    #nav button:hover {
+      background: var(--accent2);
+      color: #fff;
+      border-color: var(--accent2);
+    }
+
+    #nav button:disabled {
+      opacity: .35;
+      cursor: not-allowed;
+    }
+
+    #slide-counter {
+      font-size: .8rem;
+      color: var(--text-2);
+      min-width: 72px;
+      text-align: center;
+      font-weight: 600;
+    }
+
+    #progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent4));
+      transition: width .3s ease;
+      z-index: 999;
+    }
+
+    #hint {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      font-size: .7rem;
+      color: var(--text-2);
+      background: rgba(255, 255, 255, .9);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 5px 11px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .05);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="progress"></div>
+  <div id="hint">← → để điều hướng</div>
+
+  <div id="slideshow">
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 0 — COVER
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide active" id="s0">
+      <div class="slide-header">Mở rộng: Recording Rules · HA &amp; LTS · Security · GitOps · Alertmanager</div>
+      <div class="slide-body center">
+        <div class="section-badge">Lab #10 — Nhóm Chuyên Đề</div>
+        <h1 style="font-size:2.8rem;margin-top:10px;">PROMETHEUS &amp; GRAFANA<br />MONITORING</h1>
+        <h3 style="margin-top:2px;font-size:1rem;">Giám sát Hạ tầng Linux Chuẩn Enterprise</h3>
+        <div class="cards cards-5" style="margin-top:18px;width:100%;">
+          <div class="card" style="border-color:rgba(9,105,218,.25);align-items:center;">
+            <div class="card-icon">📊</div>
+            <div class="card-title text-blue">Recording Rules</div>
+            <div class="card-text">Metric tính sẵn, tái sử dụng</div>
+          </div>
+          <div class="card" style="border-color:rgba(26,127,55,.25);align-items:center;">
+            <div class="card-icon">🔁</div>
+            <div class="card-title text-green">HA &amp; LTS</div>
+            <div class="card-text">Active-Active, Thanos + MinIO</div>
+          </div>
+          <div class="card" style="border-color:rgba(130,80,223,.25);align-items:center;">
+            <div class="card-icon">🔒</div>
+            <div class="card-title text-purple">Security &amp; Auth</div>
+            <div class="card-text">TLS · Basic Auth · RBAC · UFW</div>
+          </div>
+          <div class="card" style="border-color:rgba(188,76,0,.25);align-items:center;">
+            <div class="card-icon">⚙️</div>
+            <div class="card-title text-orange">GitOps &amp; MaC</div>
+            <div class="card-text">Monitoring-as-Code, CI/CD</div>
+          </div>
+          <div class="card" style="border-color:rgba(207,34,46,.25);align-items:center;">
+            <div class="card-icon">🚨</div>
+            <div class="card-title text-red">Alertmanager</div>
+            <div class="card-text">Routing, Grouping, Telegram</div>
+          </div>
+        </div>
+        <p style="margin-top:14px;font-size:.82rem;">
+          <span class="badge badge-blue">mon-server 192.168.122.54</span>&nbsp;
+          <span class="badge badge-orange">mon-target 192.168.122.38</span>&nbsp;
+          <span class="badge badge-green">KVM/libvirt · Debian 12 Minimal Cloud</span>
+        </p>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>1 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 1 — Observability & 3 trụ cột
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s1">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Observability &amp; 3 Trụ Cột</h2>
+        <p style="color:var(--text-2);font-size:.84rem;font-style:italic;">Nhìn vào bên trong hệ thống từ bên ngoài</p>
+        <div class="cards cards-3" style="flex:1;">
+          <div class="card"
+            style="border-color:rgba(9,105,218,.3);display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center;padding:18px 16px;">
+            <div class="card-icon" style="font-size:2rem;margin-bottom:2px;">📈</div>
+            <div class="card-title text-blue" style="font-size:1.05rem;">Metrics</div>
+            <div class="card-text" style="font-size:.82rem;line-height:1.55;">Hệ thống đang <strong>khỏe hay
+                yếu?</strong><br /><span style="color:var(--text-2);">CPU, RAM, Disk I/O, Request/giây</span></div>
+            <div style="margin-top:8px;"><span class="badge badge-blue">Phát hiện bất thường</span></div>
+          </div>
+          <div class="card"
+            style="border-color:rgba(188,76,0,.3);display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center;padding:18px 16px;">
+            <div class="card-icon" style="font-size:2rem;margin-bottom:2px;">📄</div>
+            <div class="card-title text-orange" style="font-size:1.05rem;">Logs</div>
+            <div class="card-text" style="font-size:.82rem;line-height:1.55;">Chuyện gì đã <strong>xảy ra</strong> tại
+              thời điểm đó?<br /><span style="color:var(--text-2);">Error stack, System log, Audit trail</span></div>
+            <div style="margin-top:8px;"><span class="badge badge-orange">Điều tra nguyên nhân (RCA)</span></div>
+          </div>
+          <div class="card"
+            style="border-color:rgba(130,80,223,.3);display:flex;flex-direction:column;justify-content:space-between;align-items:center;text-align:center;padding:18px 16px;">
+            <div class="card-icon" style="font-size:2rem;margin-bottom:2px;">🛤️</div>
+            <div class="card-title text-purple" style="font-size:1.05rem;">Traces</div>
+            <div class="card-text" style="font-size:.82rem;line-height:1.55;">Request đi qua đâu, <strong>chậm ở
+                đâu?</strong><br /><span style="color:var(--text-2);">Span latency, Microservices call-path</span></div>
+            <div style="margin-top:8px;"><span class="badge badge-purple">Định vị điểm nghẽn</span></div>
+          </div>
+        </div>
+        <!-- Observability Pipeline Architecture -->
+        <div class="dn" style="padding:10px 18px;">
+          <svg viewBox="0 0 980 120" style="width:100%;max-width:980px;height:auto;overflow:visible;"
+            xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="s1-arr-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0969da" />
+              </marker>
+              <marker id="s1-arr-orange" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#bc4c00" />
+              </marker>
+              <marker id="s1-arr-purple" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#8250df" />
+              </marker>
+              <marker id="s1-arr-green" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#1a7f37" />
+              </marker>
+            </defs>
+
+            <!-- Source: Hạ tầng & Ứng dụng -->
+            <rect x="10" y="22" width="160" height="76" rx="8" fill="#ffffff" stroke="#0969da" stroke-width="1.6" />
+            <text x="90" y="54" text-anchor="middle" fill="#1f2328" font-size="12.5" font-weight="700"
+              font-family="'Inter', sans-serif">Hạ tầng &amp; Ứng dụng</text>
+            <text x="90" y="74" text-anchor="middle" fill="#57606a" font-size="10"
+              font-family="'JetBrains Mono', monospace">mon-server · target</text>
+
+            <!-- Left Streams: Hạ tầng -> 3 Trụ cột -->
+            <!-- Stream 1: Metrics -->
+            <path d="M 170 42 C 240 42, 255 23, 334 23" fill="none" stroke="#0969da" stroke-width="1.8"
+              marker-end="url(#s1-arr-blue)" />
+            <rect x="215" y="14" width="56" height="18" rx="9" fill="#ffffff" stroke="#0969da" stroke-width="1" />
+            <text x="243" y="27" text-anchor="middle" fill="#0969da" font-size="9" font-weight="600"
+              font-family="'Inter', sans-serif">Metrics</text>
+
+            <!-- Stream 2: Logs -->
+            <path d="M 170 60 L 334 60" fill="none" stroke="#bc4c00" stroke-width="1.8"
+              marker-end="url(#s1-arr-orange)" />
+            <rect x="220" y="51" width="46" height="18" rx="9" fill="#ffffff" stroke="#bc4c00" stroke-width="1" />
+            <text x="243" y="64" text-anchor="middle" fill="#bc4c00" font-size="9" font-weight="600"
+              font-family="'Inter', sans-serif">Logs</text>
+
+            <!-- Stream 3: Traces -->
+            <path d="M 170 78 C 240 78, 255 97, 334 97" fill="none" stroke="#8250df" stroke-width="1.8"
+              marker-end="url(#s1-arr-purple)" />
+            <rect x="218" y="88" width="50" height="18" rx="9" fill="#ffffff" stroke="#8250df" stroke-width="1" />
+            <text x="243" y="101" text-anchor="middle" fill="#8250df" font-size="9" font-weight="600"
+              font-family="'Inter', sans-serif">Traces</text>
+
+            <!-- 3 Pillars Boxes -->
+            <rect x="340" y="8" width="185" height="30" rx="6" fill="#ffffff" stroke="#0969da" stroke-width="1.4" />
+            <text x="432" y="28" text-anchor="middle" fill="#0969da" font-size="11.5" font-weight="600"
+              font-family="'Inter', sans-serif">📈 Prometheus TSDB</text>
+
+            <rect x="340" y="45" width="185" height="30" rx="6" fill="#ffffff" stroke="#bc4c00" stroke-width="1.4" />
+            <text x="432" y="65" text-anchor="middle" fill="#bc4c00" font-size="11.5" font-weight="600"
+              font-family="'Inter', sans-serif">📄 Loki / Log Aggregator</text>
+
+            <rect x="340" y="82" width="185" height="30" rx="6" fill="#ffffff" stroke="#8250df" stroke-width="1.4" />
+            <text x="432" y="102" text-anchor="middle" fill="#8250df" font-size="11.5" font-weight="600"
+              font-family="'Inter', sans-serif">🛤️ Tempo / Jaeger</text>
+
+            <!-- Right Streams: 3 Trụ cột -> Grafana -->
+            <path d="M 525 23 C 605 23, 625 45, 704 45" fill="none" stroke="#0969da" stroke-width="1.8"
+              marker-end="url(#s1-arr-green)" />
+            <path d="M 525 60 L 704 60" fill="none" stroke="#bc4c00" stroke-width="1.8"
+              marker-end="url(#s1-arr-green)" />
+            <path d="M 525 97 C 605 97, 625 75, 704 75" fill="none" stroke="#8250df" stroke-width="1.8"
+              marker-end="url(#s1-arr-green)" />
+
+            <!-- Middle Badge -->
+            <rect x="568" y="49" width="94" height="22" rx="6" fill="#ffffff" stroke="rgba(86,211,100,.4)"
+              stroke-width="1" />
+            <text x="615" y="64" text-anchor="middle" fill="#1a7f37" font-size="9.2" font-weight="600"
+              font-family="'Inter', sans-serif">Tương quan dữ liệu</text>
+
+            <!-- Target: Grafana Dashboard (Single Pane of Glass) -->
+            <rect x="710" y="22" width="260" height="76" rx="8" fill="#ffffff" stroke="#1a7f37" stroke-width="1.6" />
+            <text x="840" y="53" text-anchor="middle" fill="#1a7f37" font-size="13" font-weight="700"
+              font-family="'Inter', sans-serif">Grafana Dashboard</text>
+            <text x="840" y="73" text-anchor="middle" fill="#57606a" font-size="10.5"
+              font-family="'Inter', sans-serif">Single Pane of Glass (Trực quan hóa)</text>
+          </svg>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>2 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 2 — Metrics vs Logs
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s2">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Metrics vs Logs</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Tiêu chí</th>
+              <th>Metrics</th>
+              <th>Logs</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Bản chất</td>
+              <td>Float64 + Labels + Timestamp</td>
+              <td>Chuỗi text / JSON</td>
+            </tr>
+            <tr>
+              <td>Mục đích</td>
+              <td class="text-blue">Phát hiện bất thường, cảnh báo</td>
+              <td class="text-orange">Điều tra nguyên nhân (RCA)</td>
+            </tr>
+            <tr>
+              <td>Dung lượng</td>
+              <td>~1–2 bytes / điểm đo</td>
+              <td>Vài chục MB đến GB / ngày</td>
+            </tr>
+            <tr>
+              <td>Truy vấn</td>
+              <td>Cực nhanh (PromQL)</td>
+              <td>Chậm hơn, cần full-text index</td>
+            </tr>
+          </tbody>
+        </table>
+        <!-- Architecture Flow Diagram -->
+        <div class="dn" style="flex:1;justify-content:center;padding:12px 18px;">
+          <svg viewBox="0 0 1000 216" style="width:100%;max-width:1000px;height:auto;overflow:visible;"
+            xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="s2-arr-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0969da" />
+              </marker>
+              <marker id="s2-arr-purple" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#8250df" />
+              </marker>
+              <marker id="s2-arr-orange" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#bc4c00" />
+              </marker>
+              <marker id="s2-arr-green" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+                orient="auto-start-reverse">
+                <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#1a7f37" />
+              </marker>
+            </defs>
+
+            <!-- Node 1: Hạ tầng & Ứng dụng (Spans full height, vertically centered) -->
+            <rect x="10" y="66" width="175" height="68" rx="10" fill="#ffffff" stroke="#0969da" stroke-width="1.6" />
+            <text x="97" y="96" text-anchor="middle" fill="#1f2328" font-size="13" font-weight="700"
+              font-family="'Inter', sans-serif">Hạ tầng &amp; Ứng dụng</text>
+            <text x="97" y="117" text-anchor="middle" fill="#57606a" font-size="10.5"
+              font-family="'JetBrains Mono', monospace">mon-server · mon-target</text>
+
+            <!-- Arrow: Hạ tầng -> Metrics (Prometheus) -->
+            <path d="M 185 88 C 228 88, 232 46, 275 46" fill="none" stroke="#0969da" stroke-width="2"
+              marker-end="url(#s2-arr-blue)" />
+            <rect x="207" y="52" width="54" height="19" rx="9" fill="#ffffff" stroke="#0969da" stroke-width="1" />
+            <text x="234" y="65" text-anchor="middle" fill="#0969da" font-size="9.5" font-weight="600"
+              font-family="'Inter', sans-serif">Metrics</text>
+
+            <!-- Arrow: Hạ tầng -> Logs (Loki) -->
+            <path d="M 185 114 C 228 114, 232 166, 275 166" fill="none" stroke="#8250df" stroke-width="2"
+              marker-end="url(#s2-arr-purple)" />
+            <rect x="214" y="146" width="42" height="19" rx="9" fill="#ffffff" stroke="#8250df" stroke-width="1" />
+            <text x="235" y="159" text-anchor="middle" fill="#8250df" font-size="9.5" font-weight="600"
+              font-family="'Inter', sans-serif">Logs</text>
+
+            <!-- Node 2: Prometheus TSDB -->
+            <rect x="281" y="20" width="168" height="52" rx="8" fill="#ffffff" stroke="#0969da" stroke-width="1.6" />
+            <text x="365" y="44" text-anchor="middle" fill="#0969da" font-size="12.5" font-weight="700"
+              font-family="'Inter', sans-serif">Prometheus TSDB</text>
+            <text x="365" y="60" text-anchor="middle" fill="#57606a" font-size="9.5"
+              font-family="'Inter', sans-serif">Lưu trữ Time-series (Pull)</text>
+
+            <!-- Node 3: Log Aggregator / Loki -->
+            <rect x="281" y="140" width="168" height="52" rx="8" fill="#ffffff" stroke="#8250df" stroke-width="1.6" />
+            <text x="365" y="164" text-anchor="middle" fill="#8250df" font-size="12.5" font-weight="700"
+              font-family="'Inter', sans-serif">Log Aggregator / Loki</text>
+            <text x="365" y="180" text-anchor="middle" fill="#57606a" font-size="9.5"
+              font-family="'Inter', sans-serif">Tập trung &amp; Index Log (Push)</text>
+
+            <!-- Arrow: Prometheus -> Alertmanager -->
+            <path d="M 449 37 C 478 37, 478 28, 506 28" fill="none" stroke="#bc4c00" stroke-width="1.8"
+              marker-end="url(#s2-arr-orange)" />
+
+            <!-- Arrow: Prometheus -> Grafana -->
+            <path d="M 449 55 C 478 55, 478 72, 506 72" fill="none" stroke="#1a7f37" stroke-width="1.8"
+              marker-end="url(#s2-arr-green)" />
+
+            <!-- Node 4: Alertmanager -->
+            <rect x="512" y="10" width="176" height="36" rx="7" fill="#ffffff" stroke="#bc4c00" stroke-width="1.3" />
+            <text x="600" y="32" text-anchor="middle" fill="#bc4c00" font-size="11" font-weight="600"
+              font-family="'Inter', sans-serif">Alertmanager (Báo động)</text>
+
+            <!-- Node 5: Grafana Dashboard -->
+            <rect x="512" y="54" width="176" height="36" rx="7" fill="#ffffff" stroke="#1a7f37" stroke-width="1.3" />
+            <text x="600" y="76" text-anchor="middle" fill="#1a7f37" font-size="11" font-weight="600"
+              font-family="'Inter', sans-serif">Grafana Dashboard</text>
+
+            <!-- Arrow: Alertmanager -> Kỹ sư -->
+            <path d="M 688 28 C 720 28, 715 48, 744 48" fill="none" stroke="#bc4c00" stroke-width="1.8"
+              marker-end="url(#s2-arr-orange)" />
+
+            <!-- Arrow: Grafana -> Kỹ sư -->
+            <path d="M 688 72 C 720 72, 715 62, 744 62" fill="none" stroke="#1a7f37" stroke-width="1.8"
+              marker-end="url(#s2-arr-green)" />
+
+            <!-- Node 6: Kỹ sư điều tra RCA -->
+            <rect x="750" y="24" width="220" height="64" rx="9" fill="#ffffff" stroke="#bc4c00" stroke-width="1.6" />
+            <text x="860" y="50" text-anchor="middle" fill="#1f2328" font-size="12.5" font-weight="700"
+              font-family="'Inter', sans-serif">👨‍💻 Kỹ sư vận hành</text>
+            <text x="860" y="71" text-anchor="middle" fill="#bc4c00" font-size="10.5" font-weight="600"
+              font-family="'Inter', sans-serif">Định vị node lỗi &amp; Điều tra RCA</text>
+
+            <!-- Feedback Loop: Kỹ sư -> Loki for RCA log query -->
+            <path d="M 860 88 L 860 166 L 455 166" fill="none" stroke="#bc4c00" stroke-width="1.8"
+              stroke-dasharray="5 3" marker-end="url(#s2-arr-orange)" />
+            <rect x="530" y="154" width="245" height="22" rx="6" fill="#ffffff" stroke="rgba(255,166,87,.4)"
+              stroke-width="1" />
+            <text x="652" y="169" text-anchor="middle" fill="#bc4c00" font-size="9.8" font-weight="600"
+              font-family="'Inter', sans-serif">Tra cứu Log chi tiết để điều tra nguyên nhân (RCA)</text>
+          </svg>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>3 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 3 — Vì sao cần giám sát
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s3">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Vì Sao Cần Giám Sát?</h2>
+        <div class="cards cards-4" style="flex:1;">
+          <div class="card"
+            style="border-color:rgba(26,127,55,.3);justify-content:center;align-items:center;text-align:center;">
+            <div class="card-icon">🎯</div>
+            <div class="card-title text-green">Chủ động</div>
+            <div class="card-text">Phát hiện sự cố trước khi người dùng báo cáo</div>
+          </div>
+          <div class="card"
+            style="border-color:rgba(9,105,218,.3);justify-content:center;align-items:center;text-align:center;">
+            <div class="card-icon">⏱️</div>
+            <div class="card-title text-blue">MTTD / MTTR</div>
+            <div class="card-text">Giảm thời gian phát hiện và khôi phục sự cố</div>
+          </div>
+          <div class="card"
+            style="border-color:rgba(188,76,0,.3);justify-content:center;align-items:center;text-align:center;">
+            <div class="card-icon">📐</div>
+            <div class="card-title text-orange">Capacity Planning</div>
+            <div class="card-text">Dự báo tài nguyên, tránh bão hòa đột ngột</div>
+          </div>
+          <div class="card"
+            style="border-color:rgba(130,80,223,.3);justify-content:center;align-items:center;text-align:center;">
+            <div class="card-icon">🔍</div>
+            <div class="card-title text-purple">Root-Cause Analysis</div>
+            <div class="card-text">Xác định nguyên nhân gốc rễ nhanh chóng</div>
+          </div>
+        </div>
+        <!-- Timeline diagram -->
+        <div class="dn" style="padding:14px 24px;">
+          <div class="dn-hflow" style="gap:6px;">
+            <div class="dn-node red">Sự cố xảy ra</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <span class="dn-label">MTTD ↓ ngắn</span>
+              <span class="dn-arr" style="font-size:1.4rem;">→</span>
+            </div>
+            <div class="dn-node orange">Phát hiện</div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <span class="dn-label">MTTR ↓ ngắn</span>
+              <span class="dn-arr" style="font-size:1.4rem;">→</span>
+            </div>
+            <div class="dn-node blue">Khôi phục</div>
+            <span class="dn-arr" style="font-size:1.4rem;">→</span>
+            <div class="dn-node green">Bình thường</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>4 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 4 — Pull vs Push
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s4">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Pull vs Push</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <!-- Left: diagrams -->
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="dn-group">
+              <span class="dn-group-label">Pull — Prometheus</span>
+              <div class="dn-hflow" style="gap:8px;">
+                <div class="dn-node blue">Prometheus Server</div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                  <span class="dn-label" style="font-size:.62rem;">HTTP GET /metrics</span>
+                  <span class="dn-arr">→</span>
+                  <span class="dn-label" style="font-size:.62rem;color:var(--accent);">up=0 khi lỗi</span>
+                </div>
+                <div class="dn-node green">Node Exporter :9100</div>
+              </div>
+            </div>
+            <div class="dn-group" style="border-color:rgba(188,76,0,.25);">
+              <span class="dn-group-label" style="color:var(--accent5);">Push — Graphite / Telegraf</span>
+              <div class="dn-hflow" style="gap:8px;">
+                <div class="dn-node orange">Push Agent</div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                  <span class="dn-label" style="font-size:.62rem;">Gửi chủ động</span>
+                  <span class="dn-arr">→</span>
+                </div>
+                <div class="dn-node orange">Central DB</div>
+              </div>
+            </div>
+          </div>
+          <!-- Right: table -->
+          <table style="font-size:.78rem;align-self:flex-start;">
+            <thead>
+              <tr>
+                <th>Tiêu chí</th>
+                <th>Pull</th>
+                <th>Push</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Phát hiện máy sập</td>
+                <td class="text-green">Scrape lỗi → up=0</td>
+                <td class="text-red">Khó phân biệt</td>
+              </tr>
+              <tr>
+                <td>Debug</td>
+                <td class="text-green">curl trực tiếp</td>
+                <td class="text-red">Soi log agent</td>
+              </tr>
+              <tr>
+                <td>NAT / Firewall</td>
+                <td class="text-orange">Cần proxy</td>
+                <td class="text-green">Agent mở ra ngoài</td>
+              </tr>
+              <tr>
+                <td>Batch job ngắn</td>
+                <td class="text-orange">Dùng Pushgateway</td>
+                <td class="text-green">Rất phù hợp</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li><strong>CNCF Graduated</strong> — sau Kubernetes · Pull model: server tự quyết tần suất thu thập</li>
+          <li>Thách thức production: Alert Fatigue · HA · Long-term Storage · Security · GitOps</li>
+        </ul>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>5 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 5 — Bốn loại Metric
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s5">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Bốn Loại Metric</h2>
+        <pre># HELP node_cpu_seconds_total Seconds the CPUs spent in each mode.
+# TYPE node_cpu_seconds_total counter
+node_cpu_seconds_total{cpu="0",mode="idle"} 18452.73
+<span style="color:#1a7f37;">   ─── tên metric ───   ──── labels ────   ── giá trị ──</span></pre>
+        <table style="width:100%;">
+          <thead>
+            <tr>
+              <th>Loại</th>
+              <th>Đặc điểm</th>
+              <th>Ví dụ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-red">Counter</span></td>
+              <td>Chỉ tăng; reset về 0 khi restart</td>
+              <td><code>node_cpu_seconds_total</code></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-blue">Gauge</span></td>
+              <td>Tăng giảm tự do</td>
+              <td><code>node_memory_MemAvailable_bytes</code></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-orange">Histogram</span></td>
+              <td>Đếm theo bucket (<code>_bucket</code>, <code>_sum</code>, <code>_count</code>)</td>
+              <td>Độ trễ HTTP</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-purple">Summary</span></td>
+              <td>Quantile tính sẵn phía client</td>
+              <td>Thời gian xử lý</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>6 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 6 — rate()
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s6">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Vì Sao Counter Luôn Cần <code>rate()</code>?</h2>
+        <div class="formula">rate(V[t]) &nbsp;=&nbsp; ΔV / Δt</div>
+        <div class="compare" style="flex:1;">
+          <div class="compare-box wrong">
+            <div class="compare-box-title">❌ SAI — Counter thô</div>
+            <pre style="border-color:rgba(207,34,46,.35);font-size:.76rem;">node_cpu_seconds_total{mode="idle"}</pre>
+            <p style="font-size:.81rem;margin-top:8px;color:var(--text-2);">Trả về <strong
+                style="color:var(--accent);">18452 giây</strong> — con số khổng lồ, không có ý nghĩa tức thì</p>
+            <!-- Simple bar chart visual -->
+            <div style="margin-top:10px;display:flex;align-items:flex-end;gap:3px;height:44px;padding:0 4px;">
+              <div style="width:10px;background:var(--accent);opacity:.4;height:20%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);opacity:.5;height:35%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);opacity:.6;height:52%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);opacity:.7;height:68%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);opacity:.8;height:82%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);opacity:.9;height:92%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent);height:100%;border-radius:2px 2px 0 0;"></div>
+              <span style="font-size:.65rem;color:var(--text-2);margin-left:4px;align-self:center;">Tăng mãi</span>
+            </div>
+          </div>
+          <div class="compare-box right">
+            <div class="compare-box-title">✅ ĐÚNG — Sau rate()</div>
+            <pre
+              style="border-color:rgba(26,127,55,.35);font-size:.76rem;">rate(node_cpu_seconds_total{mode="idle"}[1m])</pre>
+            <p style="font-size:.81rem;margin-top:8px;color:var(--text-2);">Tốc độ tăng mỗi giây trong 1 phút.
+              <em>rate() tự xử lý counter reset về 0.</em>
+            </p>
+            <!-- Wave chart visual -->
+            <div style="margin-top:10px;display:flex;align-items:flex-end;gap:3px;height:44px;padding:0 4px;">
+              <div style="width:10px;background:var(--accent3);opacity:.7;height:40%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);opacity:.8;height:75%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);height:90%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);height:85%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);opacity:.8;height:50%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);opacity:.7;height:35%;border-radius:2px 2px 0 0;"></div>
+              <div style="width:10px;background:var(--accent3);opacity:.8;height:45%;border-radius:2px 2px 0 0;"></div>
+              <span style="font-size:.65rem;color:var(--text-2);margin-left:4px;align-self:center;">Dao động quanh mức
+                ổn định</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>7 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 7 — Kiến trúc TSDB
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s7">
+      <div class="slide-header">Phần I: Overview — Prometheus &amp; Grafana Monitoring</div>
+      <div class="slide-body">
+        <h2>Kiến Trúc TSDB của Prometheus</h2>
+        <div class="two-col r32" style="flex:1;align-items:center;">
+          <!-- CSS flow diagram -->
+          <div class="dn" style="justify-content:center;gap:0;height:100%;padding:12px 16px;">
+            <!-- Row 1: Scrape node (full width) -->
+            <div class="dn-node blue" style="padding:8px 20px;font-size:.8rem;text-align:center;width:100%;">Scrape: mẫu
+              metric mới</div>
+            <!-- Row 2: Two arrows with labels side-by-side, aligned with WAL/HeadBlock below -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;">
+              <div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;">
+                <span class="dn-arr">↓</span>
+                <span class="dn-label" style="font-size:.6rem;">1. Ghi tuần tự</span>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;">
+                <span class="dn-arr">↓</span>
+                <span class="dn-label" style="font-size:.6rem;">2. Nạp vào RAM</span>
+              </div>
+            </div>
+            <!-- Row 3: WAL | Head Block -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;">
+              <div class="dn-node orange" style="text-align:center;padding:8px;">WAL<br /><span
+                  style="font-size:.62rem;font-weight:400;color:var(--text-2);">Write-Ahead Log</span></div>
+              <div class="dn-node blue" style="text-align:center;padding:8px;">Head Block<br /><span
+                  style="font-size:.62rem;font-weight:400;color:var(--text-2);">in-memory</span></div>
+            </div>
+            <!-- Row 4: Only Head Block side continues down -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;">
+              <div></div>
+              <div style="display:flex;flex-direction:column;align-items:center;padding:4px 0;">
+                <span class="dn-arr">↓</span>
+                <span class="dn-label" style="font-size:.6rem;">Compaction 2h</span>
+              </div>
+            </div>
+            <!-- Row 5: Block bất biến (right half) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;">
+              <div></div>
+              <div class="dn-node green" style="text-align:center;padding:8px;font-size:.78rem;">Block bất
+                biến<br /><span style="font-size:.6rem;font-weight:400;color:var(--text-2);">trên đĩa</span></div>
+            </div>
+            <!-- Row 6: arrow down (right half) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;">
+              <div></div>
+              <div style="text-align:center;"><span class="dn-arr">↓</span></div>
+            </div>
+            <!-- Row 7: sub-files (right half) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;">
+              <div></div>
+              <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+                <div class="dn-node dim" style="font-size:.6rem;padding:3px 7px;">meta.json</div>
+                <div class="dn-node dim" style="font-size:.6rem;padding:3px 7px;">chunks/</div>
+                <div class="dn-node dim" style="font-size:.6rem;padding:3px 7px;">index</div>
+                <div class="dn-node dim" style="font-size:.6rem;padding:3px 7px;">tombstones</div>
+              </div>
+            </div>
+          </div>
+          <!-- Stats -->
+          <div style="display:flex;flex-direction:column;gap:16px;align-items:center;text-align:center;">
+            <div>
+              <div class="big-stat">~1.37</div>
+              <div class="big-stat-label">bytes / sample</div>
+              <p style="font-size:.73rem;margin-top:5px;color:var(--text-2);">Nén Gorilla (XOR delta-of-delta)</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+              <span class="badge badge-orange" style="justify-content:center;padding:5px;">WAL — Durability</span>
+              <span class="badge badge-blue" style="justify-content:center;padding:5px;">Head Block — Speed</span>
+              <span class="badge badge-green" style="justify-content:center;padding:5px;">Block — Immutable</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>8 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 8 — MỤC TIÊU 5 CHUYÊN ĐỀ
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s8">
+      <div class="slide-header">Báo cáo Chuyên đề Mở rộng</div>
+      <div class="slide-body">
+        <h2>Mục Tiêu 5 Chuyên Đề Mở Rộng</h2>
+        <table style="width:100%;font-size:.84rem;">
+          <thead>
+            <tr>
+              <th>Chuyên đề</th>
+              <th>Vấn đề</th>
+              <th>Giải pháp</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-blue">1. Recording Rules</span></td>
+              <td>Lặp công thức, khó bảo trì</td>
+              <td class="text-green">Metric tính sẵn dùng chung</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-green">2. HA &amp; Lưu trữ</span></td>
+              <td>Đơn điểm lỗi, giới hạn lưu trữ</td>
+              <td class="text-green">HA Replicas · Thanos · MinIO</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-purple">3. Security &amp; Auth</span></td>
+              <td>Dữ liệu và dịch vụ thiếu bảo vệ</td>
+              <td class="text-green">TLS · Xác thực · Phân quyền</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-orange">4. GitOps &amp; MaC</span></td>
+              <td>Cấu hình thủ công, khó kiểm soát</td>
+              <td class="text-green">Cấu hình bằng mã · Kiểm tra trước</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-red">5. Alertmanager</span></td>
+              <td>Cảnh báo trùng lặp, khó định tuyến</td>
+              <td class="text-green">Grouping · Routing · Telegram Notification</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flow" style="justify-content:center;flex-wrap:wrap;gap:8px;margin-top:8px;">
+          <div class="flow-box">Recording Rules</div><span class="flow-arrow">→</span>
+          <div class="flow-box">HA + LTS</div><span class="flow-arrow">→</span>
+          <div class="flow-box">Security</div><span class="flow-arrow">→</span>
+          <div class="flow-box">GitOps</div><span class="flow-arrow">→</span>
+          <div class="flow-box">Alertmanager</div><span class="flow-arrow">→</span>
+          <div class="flow-box" style="border-color:var(--accent3);color:var(--accent3);">Enterprise-Ready</div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>9 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 9 — SECTION 1 TITLE
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s9">
+      <div class="slide-header">Phần 1: Recording Rules</div>
+      <div class="slide-body center">
+        <div class="section-badge">Phần 1 / 5</div>
+        <h1 style="font-size:2.5rem;margin-top:10px;">CHUẨN HÓA TRUY VẤN<br />VỚI RECORDING RULES</h1>
+        <h3>Tính sẵn metric · Tái sử dụng cho dashboard và cảnh báo</h3>
+        <div class="dn" style="margin-top:20px;width:80%;padding:20px 30px;">
+          <div class="dn-hflow" style="gap:10px;">
+            <div class="dn-node blue">Node Exporter</div>
+            <span class="dn-arr">→</span>
+            <div class="dn-node dim">Metric gốc TSDB</div>
+            <span class="dn-arr">→</span>
+            <div class="dn-node orange">Recording Rules<br /><span style="font-size:.65rem;font-weight:400;">mỗi 5
+                giây</span></div>
+            <span class="dn-arr">→</span>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="dn-node green">Grafana</div>
+              <div class="dn-node blue">Alerting Rules</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>10 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 10 — 1.1 Vấn đề
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s10">
+      <div class="slide-header">Phần 1: Recording Rules</div>
+      <div class="slide-body">
+        <h2>1.1. Vấn Đề Tồn Đọng &amp; Phương Pháp</h2>
+        <ul>
+          <li><strong>Tính toán lặp:</strong> Dashboard và alert cùng đánh giá biểu thức CPU, RAM, đĩa</li>
+          <li><strong>Khó bảo trì:</strong> Công thức nằm nhiều vị trí — thay đổi dễ bỏ sót hoặc lệch cách tính</li>
+          <li><strong>Giải pháp:</strong> Recording Rules tích hợp sẵn trong Prometheus — không thêm dịch vụ</li>
+        </ul>
+        <div class="compare" style="flex:1;">
+          <div class="compare-box wrong">
+            <div class="compare-box-title">❌ Trước — PromQL lặp nhiều nơi</div>
+            <pre style="font-size:.72rem;border-color:rgba(207,34,46,.25);"># Dashboard Panel 1:
+100 - avg(rate(node_cpu_seconds_total
+  {mode="idle"}[1m]))*100
+
+# Alert Rule (lặp y chang):
+100 - avg(rate(node_cpu_seconds_total
+  {mode="idle"}[1m]))*100 > 80
+
+# Panel 2 (window khác → kết quả lệch):
+100 - avg(rate(node_cpu_seconds_total
+  {mode="idle"}[5m]))*100</pre>
+          </div>
+          <div class="compare-box right">
+            <div class="compare-box-title">✅ Sau — Recording Rule một lần</div>
+            <pre style="font-size:.72rem;border-color:rgba(26,127,55,.25);"># Định nghĩa 1 lần trong rule file:
+record: instance:cpu_usage:percent
+expr: 100 - (avg by (instance)(
+  rate(node_cpu_seconds_total
+    {mode="idle"}[1m]))*100)
+
+# Dashboard &amp; Alert đều dùng chung:
+instance:cpu_usage:percent
+instance:cpu_usage:percent > 80</pre>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>11 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 11 — 1.2 Thiết kế Rule
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s11">
+      <div class="slide-header">Phần 1: Recording Rules</div>
+      <div class="slide-body">
+        <h2>1.2–1.3. Thiết Kế Cấu Hình &amp; Tích Hợp (Grafana / Alert)</h2>
+        <pre
+          style="font-size:.76rem;">groups:
+  - name: linux_host_recording_rules
+    interval: <span style="color:#bc4c00;">5s</span>
+    rules:
+      - record: <span style="color:#1a7f37;">instance:cpu_usage:percent</span>
+        expr: |
+          100 - (avg by (instance) (
+            rate(node_cpu_seconds_total{mode=<span style="color:#0969da;">"idle"</span>}[<span style="color:#bc4c00;">1m</span>])) * 100)</pre>
+        <div class="cards cards-3" style="margin-top:4px;">
+          <div class="card">
+            <div class="card-title text-orange">5 Rules (1.2)</div>
+            <div class="card-text">CPU · RAM · Đĩa gốc · Mạng nhận · Mạng gửi</div>
+          </div>
+          <div class="card">
+            <div class="card-title text-blue"><code>record / expr</code></div>
+            <div class="card-text">Tên metric đầu ra / Công thức PromQL</div>
+          </div>
+          <div class="card">
+            <div class="card-title text-green"><code>5s / [1m]</code></div>
+            <div class="card-text">Chu kỳ đánh giá / Cửa sổ tính tốc độ</div>
+          </div>
+        </div>
+        <table style="margin-top:8px;">
+          <thead>
+            <tr>
+              <th>Chỉ số</th>
+              <th>Metric dùng chung (record)</th>
+              <th>Tích hợp Dashboard &amp; Alert (1.3)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CPU</td>
+              <td><code>instance:cpu_usage:percent</code></td>
+              <td>Grafana Dashboard &amp; Alert CPU &gt; 80% (for 1m)</td>
+            </tr>
+            <tr>
+              <td>RAM</td>
+              <td><code>instance:memory_usage:percent</code></td>
+              <td>Grafana Dashboard &amp; Alert RAM &gt; 85%</td>
+            </tr>
+            <tr>
+              <td>Đĩa gốc</td>
+              <td><code>instance:root_disk_usage:percent</code></td>
+              <td>Grafana Dashboard &amp; Alert Disk &gt; 90%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>12 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 12 — 1.4+1.5 Demo
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s12">
+      <div class="slide-header">Phần 1: Recording Rules</div>
+      <div class="slide-body">
+        <h2>1.4–1.5. Nạp Cấu Hình, Demo &amp; Giới Hạn</h2>
+        <div class="two-col" style="flex:1;gap:14px;">
+          <div>
+            <pre style="font-size:.72rem;"># Kiểm tra trước khi reload
+promtool check rules recording_rules.yml
+promtool check config prometheus.yml
+sudo kill -HUP $(systemctl show \
+  -p MainPID --value prometheus)
+
+# Tạo tải CPU thử nghiệm
+stress-ng --cpu $(nproc) \
+  --cpu-load 100 --timeout 180s</pre>
+            <table style="margin-top:10px;font-size:.78rem;">
+              <thead>
+                <tr>
+                  <th>Kiểm chứng</th>
+                  <th>Kết quả kỳ vọng</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>So sánh CPU vs công thức gốc</td>
+                  <td class="text-green">Khớp timestamp</td>
+                </tr>
+                <tr>
+                  <td>Grafana khi tạo tải</td>
+                  <td class="text-green">CPU tăng / giảm rõ</td>
+                </tr>
+                <tr>
+                  <td>CPU &gt; 80% liên tục 1m</td>
+                  <td class="text-green">Alert → Firing</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="card" style="border-color:rgba(26,127,55,.25);">
+              <div class="card-title text-green">✓ Giải quyết được</div>
+              <ul style="margin-top:6px;">
+                <li>Công thức tập trung một nơi</li>
+                <li>Kết quả nhất quán dashboard ↔ alert</li>
+                <li>Giảm tính toán lặp tại query time</li>
+              </ul>
+            </div>
+            <div class="card" style="border-color:rgba(188,76,0,.25);">
+              <div class="card-title text-orange">⚠ Đánh đổi</div>
+              <ul style="margin-top:6px;">
+                <li>Thêm chi phí tính toán &amp; lưu trữ</li>
+                <li>Không tạo lịch sử trước khi bật</li>
+                <li>Chưa có benchmark tốc độ cụ thể</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>13 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 13 — SECTION 2 TITLE
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s13">
+      <div class="slide-header">Phần 2: High Availability &amp; Long-Term Storage</div>
+      <div class="slide-body center">
+        <div class="section-badge">Phần 2 / 5</div>
+        <h1 style="font-size:2.4rem;margin-top:10px;">TÍNH SẴN SÀNG CAO<br />&amp; LƯU TRỮ DÀI HẠN</h1>
+        <h3>2.1. Thách Thức Của Prometheus Local TSDB (SPOF · Storage · OOM)</h3>
+        <div class="cards cards-3" style="margin-top:18px;width:100%;">
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">💀</div>
+            <div class="card-title text-red">SPOF</div>
+            <div class="card-text">1 node <code>mon-server</code> chết → Mù toàn bộ giám sát &amp; tê liệt cảnh báo
+            </div>
+          </div>
+          <div class="card" style="align-items:center;border-color:rgba(188,76,0,.25);">
+            <div class="card-icon">💽</div>
+            <div class="card-title text-orange">Storage Exhaustion</div>
+            <div class="card-text">Scrape interval 5s → Đĩa phình nhanh, khó giữ data &gt;1 tháng</div>
+          </div>
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">💥</div>
+            <div class="card-title text-red">OOM Crash</div>
+            <div class="card-text">Query lịch sử 6–12 tháng → nạp hàng nghìn block vào RAM → Crash</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>14 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 14 — 2.2 Tối ưu Local TSDB
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s14">
+      <div class="slide-header">Phần 2: High Availability &amp; Long-Term Storage</div>
+      <div class="slide-body">
+        <h2>2.2. Tối Ưu Hóa Local TSDB</h2>
+        <div class="two-col" style="flex:1;">
+          <div>
+            <pre style="font-size:.72rem;"># /etc/fstab — loại bỏ access time write
+LABEL=prometheus_data /var/lib/prometheus \
+  ext4 defaults,<span style="color:#bc4c00;">noatime</span> 0 2
+
+# Prometheus service flags
+--storage.tsdb.retention.time=<span style="color:#1a7f37;">15d</span>
+--storage.tsdb.retention.size=<span style="color:#1a7f37;">10GB</span>
+--storage.tsdb.wal-compression    <span style="color:#57606a;"># Snappy</span></pre>
+            <ul style="margin-top:10px;">
+              <li><code>noatime</code> — Triệt tiêu I/O cập nhật access time khi đọc chunk</li>
+              <li><code>retention.time=15d</code> — Tự động xóa block cũ sau 15 ngày</li>
+              <li><code>retention.size=10GB</code> — Xóa sớm nếu đĩa chạm 10 GB</li>
+            </ul>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;">
+            <div style="text-align:center;">
+              <div class="big-stat" style="color:var(--accent3);">30–50%</div>
+              <div class="big-stat-label">Giảm RAM &amp; đĩa của WAL</div>
+              <p style="font-size:.72rem;margin-top:4px;color:var(--text-2);">nhờ nén Snappy</p>
+            </div>
+            <div class="card" style="border-color:rgba(9,105,218,.25);width:100%;text-align:center;">
+              <div class="card-title text-blue">Retention Kép</div>
+              <div class="card-text">Xóa theo <strong>thời gian</strong> và <strong>dung lượng</strong><br />Điều kiện
+                nào đến trước → kích hoạt trước</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>15 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 15 — 2.3 Active-Active
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s15">
+      <div class="slide-header">Phần 2: High Availability &amp; Long-Term Storage</div>
+      <div class="slide-body">
+        <h2>2.3. Kiến Trúc Dual-Instance Active-Active</h2>
+        <!-- CSS HA diagram -->
+        <div class="dn" style="flex:1;justify-content:center;gap:10px;">
+          <div style="display:flex;gap:20px;justify-content:center;">
+            <div class="dn-node blue" style="text-align:center;padding:12px 20px;">
+              Prometheus A<br /><code style="font-size:.65rem;color:var(--text-2);">:9090 · replica=a</code>
+            </div>
+            <div class="dn-node blue" style="text-align:center;padding:12px 20px;">
+              Prometheus B<br /><code style="font-size:.65rem;color:var(--text-2);">:9091 · replica=b</code>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;width:100%;max-width:380px;">
+            <div style="text-align:center;"><span class="dn-arr">↓</span></div>
+            <div style="text-align:center;"><span class="dn-arr">↓</span></div>
+          </div>
+          <p style="font-size:.72rem;color:var(--text-2);text-align:center;margin-top:-6px;">Cùng scrape
+            <code>mon-target:9100</code> độc lập
+          </p>
+          <div class="dn-node orange" style="padding:12px 32px;text-align:center;">
+            Alertmanager<br />
+            <span style="font-size:.7rem;font-weight:400;color:var(--text-2);">Fingerprint deduplication ·
+              <code>group_wait: 10s</code></span>
+          </div>
+          <span class="dn-arr">↓</span>
+          <div class="dn-node green" style="padding:10px 32px;text-align:center;">
+            Telegram — <strong>1 Alert duy nhất</strong>
+          </div>
+        </div>
+        <ul>
+          <li>Cả 2 instance scrape <strong>độc lập</strong> — nếu A chết, B vẫn tiếp tục</li>
+          <li>Alertmanager băm nhãn alert → <strong>Fingerprint</strong> → loại trùng lặp tự động</li>
+        </ul>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>16 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 16 — 2.4 Thanos + MinIO
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s16">
+      <div class="slide-header">Phần 2: High Availability &amp; Long-Term Storage</div>
+      <div class="slide-body">
+        <h2>2.4. Lưu Trữ Dài Hạn: Thanos &amp; MinIO</h2>
+        <!-- CSS LTS Architecture diagram -->
+        <div class="dn" style="flex:1;justify-content:center;gap:8px;">
+          <div style="display:flex;gap:16px;justify-content:center;">
+            <div class="dn-node blue" style="text-align:center;padding:8px 16px;">Prometheus A<br /><span
+                style="font-size:.65rem;font-weight:400;color:var(--text-2);">:9090</span></div>
+            <div class="dn-node blue" style="text-align:center;padding:8px 16px;">Prometheus B<br /><span
+                style="font-size:.65rem;font-weight:400;color:var(--text-2);">:9091</span></div>
+          </div>
+          <div style="display:flex;gap:36px;justify-content:center;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <span class="dn-arr">↓</span><span class="dn-label" style="font-size:.6rem;">block 2h</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+              <span class="dn-arr">↓</span><span class="dn-label" style="font-size:.6rem;">block 2h</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:16px;justify-content:center;">
+            <div class="dn-node purple" style="text-align:center;padding:8px 14px;">Thanos Sidecar<br /><span
+                style="font-size:.65rem;font-weight:400;color:var(--text-2);">:10901</span></div>
+            <div class="dn-node purple" style="text-align:center;padding:8px 14px;">Thanos Sidecar<br /><span
+                style="font-size:.65rem;font-weight:400;color:var(--text-2);">:10902</span></div>
+          </div>
+          <div style="display:flex;gap:2px;justify-content:center;align-items:center;">
+            <span class="dn-arr" style="margin-right:20px;">↓</span>
+            <span class="dn-label" style="font-size:.65rem;">Đẩy block lên S3</span>
+            <span class="dn-arr" style="margin-left:20px;">↙</span>
+          </div>
+          <div class="dn-node orange" style="padding:10px 40px;text-align:center;">
+            MinIO S3 Server :9000<br />
+            <span style="font-size:.65rem;font-weight:400;color:var(--text-2);">Bucket: <code>thanos-lts</code> · AWS S3
+              compatible</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:1px;">
+            <span class="dn-arr">↓</span><span class="dn-label" style="font-size:.6rem;">Đọc block lịch sử</span>
+          </div>
+          <div class="dn-node green" style="padding:10px 32px;text-align:center;">
+            Thanos Querier :10903 → <strong>Grafana Dashboard</strong><br />
+            <span style="font-size:.65rem;font-weight:400;color:var(--text-2);">Hot: Local TSDB + Cold: MinIO — xuyên
+              suốt 1 năm+</span>
+          </div>
+        </div>
+        <div class="cards cards-3" style="margin-top:4px;">
+          <div class="card">
+            <div class="card-title text-blue">Thanos Sidecar</div>
+            <div class="card-text">Gắn liền TSDB, đẩy block 2h lên MinIO</div>
+          </div>
+          <div class="card">
+            <div class="card-title text-orange">MinIO Object Storage</div>
+            <div class="card-text">Tương thích AWS S3 API, triển khai gọn nhẹ</div>
+          </div>
+          <div class="card">
+            <div class="card-title text-green">Thanos Querier</div>
+            <div class="card-text">Hợp nhất dữ liệu nóng + lạnh thành 1 API</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>17 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 17 — 2.5 So sánh
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s17">
+      <div class="slide-header">Phần 2: High Availability &amp; Long-Term Storage</div>
+      <div class="slide-body">
+        <h2>2.5. Demo &amp; So Sánh Giải Pháp Lưu Trữ</h2>
+        <div class="card" style="border-color:rgba(26,127,55,.25);margin-bottom:8px;">
+          <div class="card-title text-green">🎬 Demo HA Failover</div>
+          <div class="card-text" style="margin-top:6px;">
+            <strong>1.</strong> Chạy <code>stress-ng</code> → Alert <code>HighCPUUsage</code> chuyển FIRING &nbsp;
+            <strong>2.</strong> Tắt Prometheus A: <code>systemctl stop prometheus</code> &nbsp;
+            <strong>3.</strong> Kết quả: Alertmanager vẫn FIRING từ Prometheus B · Không gián đoạn · Không trùng lặp
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Tiêu chí</th>
+              <th>Local TSDB</th>
+              <th>HA Replicas</th>
+              <th>HA + Thanos &amp; MinIO</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mức sẵn sàng</td>
+              <td class="text-red">Thấp (SPOF)</td>
+              <td class="text-orange">Cao (Active-Active)</td>
+              <td class="text-green">Tối đa</td>
+            </tr>
+            <tr>
+              <td>Thời gian lưu trữ</td>
+              <td class="text-orange">15 ngày</td>
+              <td class="text-orange">15 ngày</td>
+              <td class="text-green">Không giới hạn</td>
+            </tr>
+            <tr>
+              <td>Chi phí ổ cứng</td>
+              <td class="text-red">Đắt (SSD máy chủ)</td>
+              <td class="text-red">Đắt gấp đôi</td>
+              <td class="text-green">Rất rẻ (Object Storage)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>18 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 18 — SECTION 3 TITLE
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s18">
+      <div class="slide-header">Phần 3: Security &amp; Quản Lý Quyền Truy Cập</div>
+      <div class="slide-body center">
+        <div class="section-badge">Phần 3 / 5</div>
+        <h1 style="font-size:2.3rem;margin-top:10px;">BẢO MẬT &amp; QUẢN LÝ<br />QUYỀN TRUY CẬP</h1>
+        <h3>3.1. Mô Hình Đe Dọa (Threat Model) Hạ Tầng Giám Sát</h3>
+        <div class="cards cards-4" style="margin-top:18px;width:100%;">
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">🕵️</div>
+            <div class="card-title text-red">Information Disclosure</div>
+            <div class="card-text">Node Exporter :9100 lộ toàn bộ kernel, tiến trình, mạng</div>
+          </div>
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">🎧</div>
+            <div class="card-title text-red">Eavesdropping</div>
+            <div class="card-text">Chỉ số &amp; token truyền plaintext trên mạng nội bộ</div>
+          </div>
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">💣</div>
+            <div class="card-title text-red">Data Destruction</div>
+            <div class="card-text">Admin API cho phép POST xóa trắng time-series</div>
+          </div>
+          <div class="card" style="align-items:center;border-color:rgba(207,34,46,.25);">
+            <div class="card-icon">👤</div>
+            <div class="card-title text-red">Anonymous Access</div>
+            <div class="card-text">Grafana cho đăng ký tự do &amp; xem ẩn danh</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>19 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 19 — 3.2 Nginx TLS
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s19">
+      <div class="slide-header">Phần 3: Security &amp; Quản Lý Quyền Truy Cập</div>
+      <div class="slide-body">
+        <h2>3.2. Mã Hóa Đường Truyền: Nginx TLS Reverse Proxy</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <!-- CSS proxy diagram -->
+          <div class="dn" style="justify-content:center;gap:8px;">
+            <div class="dn-node blue" style="text-align:center;padding:10px 20px;">
+              Trình duyệt / Client<br />
+              <span style="font-size:.68rem;font-weight:400;color:var(--text-2);">HTTPS :443 · TLS 1.3</span>
+            </div>
+            <span class="dn-arr">↓</span>
+            <div class="dn-node orange" style="text-align:center;padding:10px 20px;width:90%;">
+              Nginx Reverse Proxy (mon-server)<br />
+              <span style="font-size:.68rem;font-weight:400;color:var(--text-2);">HTTP :80 → 301 Redirect → :443</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;width:90%;text-align:center;">
+              <span class="dn-arr">↓</span>
+              <span class="dn-arr">↓</span>
+              <span class="dn-arr">↓</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:90%;">
+              <div class="dn-node green" style="text-align:center;font-size:.72rem;">/<br />Grafana :3000</div>
+              <div class="dn-node blue" style="text-align:center;font-size:.72rem;">/prometheus/<br />:9090</div>
+              <div class="dn-node purple" style="text-align:center;font-size:.72rem;">/alertmanager/<br />:9093</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <ul>
+              <li>RSA 2048-bit · <code>TLSv1.2</code> + <code>TLSv1.3</code></li>
+              <li>HTTP → HTTPS redirect tự động (301)</li>
+              <li><strong>HSTS</strong> · <code>X-Content-Type-Options: nosniff</code></li>
+              <li>SSL Termination tập trung tại một điểm</li>
+            </ul>
+            <div class="cards cards-2" style="margin-top:8px;">
+              <div class="card" style="border-color:rgba(26,127,55,.25);align-items:center;text-align:center;">
+                <div class="card-icon">🔐</div>
+                <div class="card-title text-green">Mã hóa đầu-cuối</div>
+              </div>
+              <div class="card" style="border-color:rgba(9,105,218,.25);align-items:center;text-align:center;">
+                <div class="card-icon">🚪</div>
+                <div class="card-title text-blue">Single Entry Point</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>20 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 20 — 3.3 Basic Auth & RBAC
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s20">
+      <div class="slide-header">Phần 3: Security &amp; Quản Lý Quyền Truy Cập</div>
+      <div class="slide-body">
+        <h2>3.3. Basic Auth (bcrypt) &amp; Phân Quyền RBAC</h2>
+        <div class="two-col" style="flex:1;">
+          <div>
+            <pre style="font-size:.72rem;"># Tạo hash bcrypt (cost factor = 10)
+htpasswd -B -C 10 web_auth.htpasswd admin
+
+# web.yml — khai báo trong service flag
+basic_auth_users:
+  admin: $2y$10$...bcrypt_hash...
+
+# prometheus.yml — scrape an toàn
+basic_auth:
+  username: "scraper"
+  password: "ScraperStrongPassword2026!"</pre>
+            <ul style="margin-top:8px;">
+              <li>bcrypt cost=10 — brute-force cực khó</li>
+              <li>Cờ: <code>--web.config.file=/etc/prometheus/web.yml</code></li>
+              <li><code>allow_sign_up = false</code> trong <code>grafana.ini</code></li>
+              <li><code>[auth.anonymous] enabled = false</code></li>
+            </ul>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="card" style="border-color:rgba(207,34,46,.25);">
+              <div class="card-title text-red">👑 Admin</div>
+              <div class="card-text" style="margin-top:4px;">Quản trị datasource, user, bảo mật toàn hệ thống</div>
+            </div>
+            <div class="card" style="border-color:rgba(188,76,0,.25);">
+              <div class="card-title text-orange">✏️ Editor</div>
+              <div class="card-text" style="margin-top:4px;">Tạo và chỉnh sửa dashboard, alert rules</div>
+            </div>
+            <div class="card" style="border-color:rgba(9,105,218,.25);">
+              <div class="card-title text-blue">👁 Viewer</div>
+              <div class="card-text" style="margin-top:4px;">Chỉ có quyền đọc — không chỉnh sửa cấu hình</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>21 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 21 — 3.4+3.5 UFW & Demo
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s21">
+      <div class="slide-header">Phần 3: Security &amp; Quản Lý Quyền Truy Cập</div>
+      <div class="slide-body">
+        <h2>3.4–3.5. UFW Firewall &amp; Kiểm Chứng An Ninh</h2>
+        <div class="two-col" style="flex:1;">
+          <div>
+            <pre style="font-size:.72rem;"># mon-target: Cô lập Exporter
+ufw default deny incoming
+ufw allow 22/tcp          # SSH quản trị
+
+# Chỉ mở :9100 cho mon-server
+sudo ufw allow from <span style="color:#bc4c00;">192.168.122.54</span> \
+  to any port 9100 proto tcp
+
+# mon-server: Bind loopback only
+# :3000 :9090 :9093 → 127.0.0.1
+# Mở ra ngoài: 22, 80, 443</pre>
+            <ul style="margin-top:8px;">
+              <li><strong>Loại bỏ</strong> cờ <code>--web.enable-admin-api</code> khỏi systemd</li>
+              <li>Ngăn <code>POST /api/v1/admin/tsdb/delete_series</code></li>
+            </ul>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <table style="font-size:.78rem;">
+              <thead>
+                <tr>
+                  <th>Kịch bản Demo</th>
+                  <th>Kết quả quan sát</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1. Ép HTTPS</td>
+                  <td class="text-green">301 Moved Permanently → :443</td>
+                </tr>
+                <tr>
+                  <td>2. Basic Auth sai</td>
+                  <td class="text-green">401 Unauthorized</td>
+                </tr>
+                <tr>
+                  <td>3. Tường lửa UFW</td>
+                  <td class="text-green">Connection timed out</td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- Defense layers diagram -->
+            <div class="dn" style="gap:5px;padding:12px 16px;flex:1;justify-content:center;">
+              <span
+                style="font-size:.72rem;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">Phòng
+                thủ đa tầng</span>
+              <div class="dn-node blue" style="width:90%;text-align:center;">UFW — Cô lập mạng</div>
+              <div class="dn-node purple" style="width:80%;text-align:center;">TLS 1.3 — Mã hóa</div>
+              <div class="dn-node orange" style="width:70%;text-align:center;">Basic Auth bcrypt</div>
+              <div class="dn-node green" style="width:60%;text-align:center;">RBAC Grafana</div>
+              <div class="dn-node red" style="width:50%;text-align:center;">Disable Admin API</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>22 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 22 — SECTION 4 TITLE
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s22">
+      <div class="slide-header">Phần 4: GitOps &amp; Monitoring as Code</div>
+      <div class="slide-body center">
+        <div class="section-badge">Phần 4 / 5</div>
+        <h1 style="font-size:2.4rem;margin-top:10px;">GITOPS &amp;<br />MONITORING AS CODE</h1>
+        <h3>4.1. Thách Thức Vận Hành Thủ Công (ClickOps) &amp; Mục Tiêu GitOps</h3>
+        <div class="compare" style="margin-top:16px;width:100%;">
+          <div class="compare-box wrong">
+            <div class="compare-box-title">❌ ClickOps (Thủ công)</div>
+            <ul style="margin-top:8px;">
+              <li>Bấm chuột cấu hình trên Web UI</li>
+              <li>Không có version control</li>
+              <li>Configuration Drift</li>
+              <li>Disaster Recovery Failure</li>
+            </ul>
+          </div>
+          <div class="compare-box right">
+            <div class="compare-box-title">✅ GitOps / Monitoring-as-Code</div>
+            <ul style="margin-top:8px;">
+              <li>100% tài nguyên là code (YAML/JSON)</li>
+              <li>Git = Single Source of Truth</li>
+              <li>Kiểm tra cú pháp trước khi nạp</li>
+              <li>Hot-Reload không làm rớt dịch vụ</li>
+            </ul>
+          </div>
+        </div>
+        <div class="flow" style="margin-top:14px;justify-content:center;">
+          <div class="flow-box">Git Repository</div><span class="flow-arrow">→</span>
+          <div class="flow-box">Code Review</div><span class="flow-arrow">→</span>
+          <div class="flow-box">promtool check</div><span class="flow-arrow">→</span>
+          <div class="flow-box" style="border-color:var(--accent3);color:var(--accent3);">Hot-Reload</div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>23 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 23 — 4.2+4.3 Provisioning & File SD
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s23">
+      <div class="slide-header">Phần 4: GitOps &amp; Monitoring as Code</div>
+      <div class="slide-body">
+        <h2>4.2–4.3. Grafana Provisioning &amp; File-based Service Discovery</h2>
+        <div class="two-col" style="flex:1;">
+          <div>
+            <p style="font-size:.78rem;color:var(--text-2);margin-bottom:5px;"><strong class="text-blue">Datasource as
+                Code</strong> — <code>/etc/grafana/provisioning/</code></p>
+            <pre style="font-size:.7rem;">apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    url: http://localhost:9090
+    isDefault: true
+    editable: false  # khóa UI, chống drift</pre>
+            <p style="font-size:.78rem;color:var(--text-2);margin-top:8px;margin-bottom:5px;"><strong
+                class="text-orange">File SD</strong> — <code>prometheus.yml</code></p>
+            <pre style="font-size:.7rem;">- job_name: "node_exporter"
+  file_sd_configs:
+    - files:
+        - '/etc/prometheus/targets/*.json'
+      refresh_interval: 5s</pre>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="card" style="border-color:rgba(26,127,55,.25);">
+              <div class="card-title text-green">🔄 Disaster Recovery</div>
+              <div class="card-text"><code>rm -f grafana.db</code> → restart → 100% Datasource &amp; Dashboard tái sinh
+                trong <strong>&lt; 5 giây</strong></div>
+            </div>
+            <div class="card" style="border-color:rgba(9,105,218,.25);">
+              <div class="card-title text-blue">⚡ Dynamic Target</div>
+              <div class="card-text">Thêm IP vào <code>nodes.json</code> → Prometheus tự nạp sau <strong>5 giây</strong>
+                — không reload, không restart</div>
+            </div>
+            <div class="card" style="border-color:rgba(207,34,46,.25);">
+              <div class="card-title text-red">🚫 Static Config (cũ)</div>
+              <div class="card-text">Thêm IP → sửa file → restart → Rủi ro cú pháp làm sập monitoring</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>24 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 24 — 4.4+4.5 Pipeline & So sánh
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s24">
+      <div class="slide-header">Phần 4: GitOps &amp; Monitoring as Code</div>
+      <div class="slide-body">
+        <h2>4.4–4.5. Pipeline Triển Khai &amp; So Sánh Vận Hành</h2>
+        <div class="two-col" style="flex:1;">
+          <pre style="font-size:.68rem;align-self:flex-start;"># 1. Kiểm tra cú pháp TRƯỚC khi triển khai
+promtool check config configs/prometheus/prometheus.yml
+promtool check rules  configs/prometheus/*.yml
+amtool check-config   configs/alertmanager/alertmanager.yml
+
+# 2. Đồng bộ file cấu hình hệ thống
+sudo cp configs/prometheus/*.yml /etc/prometheus/
+sudo cp configs/prometheus/targets/*.json \
+  /etc/prometheus/targets/
+
+# 3. Đồng bộ Grafana Provisioning &amp; Dashboards
+sudo cp configs/grafana/json/*.json \
+  /var/lib/grafana/dashboards/
+
+# 4. Hot-Reload — không rớt dịch vụ
+curl -s -X POST http://localhost:9090/-/reload
+sudo systemctl reload alertmanager
+sudo systemctl restart grafana-server</pre>
+          <table style="font-size:.78rem;align-self:flex-start;">
+            <thead>
+              <tr>
+                <th>Tiêu chí</th>
+                <th>ClickOps</th>
+                <th>GitOps</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Quản lý thay đổi</td>
+                <td class="text-red">Bấm chuột</td>
+                <td class="text-green">Git commit + audit</td>
+              </tr>
+              <tr>
+                <td>Bắt lỗi cú pháp</td>
+                <td class="text-red">Khi dịch vụ crash</td>
+                <td class="text-green">promtool trước</td>
+              </tr>
+              <tr>
+                <td>Thời gian khôi phục</td>
+                <td class="text-red">Mất hàng ngày</td>
+                <td class="text-green">&lt; 30 giây</td>
+              </tr>
+              <tr>
+                <td>Độ nhất quán</td>
+                <td class="text-red">Dễ lệch cấu hình</td>
+                <td class="text-green">100% đồng nhất</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>25 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 25 — SECTION 5 TITLE & 5.1
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s25">
+      <div class="slide-header">Phần 5: Điều Phối Cảnh Báo Với Alertmanager</div>
+      <div class="slide-body center">
+        <div class="section-badge">Phần 5 / 5</div>
+        <h1 style="font-size:2.4rem;margin-top:10px;">ĐIỀU PHỐI CẢNH BÁO<br />VỚI ALERTMANAGER</h1>
+        <h3 style="margin-top:2px;">5.1. Alert Routing · Grouping · Deduplication · Telegram Notification</h3>
+
+        <!-- Pipeline diagram: Prometheus -> Alertmanager -> Telegram -->
+        <div class="dn" style="margin-top:14px;width:92%;padding:14px 22px;">
+          <div class="dn-hflow" style="gap:14px;justify-content:center;">
+            <div class="dn-node blue" style="padding:10px 18px;text-align:center;">
+              <strong>Prometheus Server (:9090)</strong><br />
+              <span style="font-size:.65rem;color:var(--text-2);font-weight:400;">Detection — Đánh giá PromQL định
+                kỳ</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <span class="dn-label" style="font-size:.62rem;">POST /api/v2/alerts</span>
+              <span class="dn-arr" style="font-size:1.3rem;">→</span>
+            </div>
+            <div class="dn-node red" style="padding:10px 18px;text-align:center;">
+              <strong>Alertmanager (:9093)</strong><br />
+              <span style="font-size:.65rem;color:var(--text-2);font-weight:400;">Routing &amp; Deduplication &amp;
+                Grouping</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <span class="dn-label" style="font-size:.62rem;">HTTPS Webhook API</span>
+              <span class="dn-arr" style="font-size:1.3rem;">→</span>
+            </div>
+            <div class="dn-node green" style="padding:10px 18px;text-align:center;">
+              <strong>Telegram Bot</strong><br />
+              <span style="font-size:.65rem;color:var(--text-2);font-weight:400;">Notification — Gửi tin Firing &amp;
+                Resolved</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cards cards-3" style="margin-top:14px;width:100%;">
+          <div class="card" style="border-color:rgba(207,34,46,.25);align-items:center;text-align:center;">
+            <div class="card-icon">🔕</div>
+            <div class="card-title text-red">Giảm Alert Fatigue</div>
+            <div class="card-text">Gom hàng chục cảnh báo liên quan vào 1 tin nhắn duy nhất qua <code>group_wait</code>
+            </div>
+          </div>
+          <div class="card" style="border-color:rgba(9,105,218,.25);align-items:center;text-align:center;">
+            <div class="card-icon">🎯</div>
+            <div class="card-title text-blue">Định Tuyến Đa Kênh</div>
+            <div class="card-text">Phân luồng theo <code>severity</code>, <code>service</code> gửi đúng Telegram, Email,
+              Slack</div>
+          </div>
+          <div class="card" style="border-color:rgba(26,127,55,.25);align-items:center;text-align:center;">
+            <div class="card-icon">⚡</div>
+            <div class="card-title text-green">Rút Ngắn MTTR</div>
+            <div class="card-text">Nội dung có ngữ cảnh chi tiết (summary, description, timestamp) giúp xử lý ngay</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>26 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 26 — 5.2 Cấu hình Routing & Telegram
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s26">
+      <div class="slide-header">Phần 5: Điều Phối Cảnh Báo Với Alertmanager</div>
+      <div class="slide-body">
+        <h2>5.2. Cấu Hình Routing &amp; Thông Báo Telegram</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <div>
+            <p style="font-size:.78rem;color:var(--text-2);margin-bottom:4px;"><strong
+                class="text-red">/etc/alertmanager/alertmanager.yml</strong></p>
+            <pre style="font-size:.67rem;line-height:1.5;">route:
+  group_by: ['alertname', 'instance', 'severity']
+  group_wait: 5s
+  group_interval: 10s
+  repeat_interval: 2h
+  receiver: 'telegram-bot'
+
+receivers:
+  - name: 'telegram-bot'
+    telegram_configs:
+      - bot_token: 'YOUR_BOT_TOKEN'
+        chat_id: YOUR_CHAT_ID
+        parse_mode: HTML
+        send_resolved: true
+        message: |
+          {{ range .Alerts }}
+          <b>{{ if eq .Status "firing" }}🔥 CẢNH BÁO{{ else }}✅ ĐÃ KHẮC PHỤC{{ end }}</b>
+          <b>Cảnh báo:</b> {{ .Annotations.summary }}
+          <b>Mức độ:</b> <code>{{ .Labels.severity }}</code>
+          <b>Đối tượng:</b> <code>{{ .Labels.instance }}</code>
+          <b>Bắt đầu:</b> <code>{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}</code>
+          {{ end }}</pre>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <table style="font-size:.75rem;">
+              <thead>
+                <tr>
+                  <th>Tham số</th>
+                  <th>Chức năng &amp; Ý nghĩa vận hành</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>group_by</code></td>
+                  <td>Gom các alert có cùng nhãn vào chung một nhóm gửi</td>
+                </tr>
+                <tr>
+                  <td><code>group_wait: 5s</code></td>
+                  <td>Chờ gom thêm alert cùng nhóm trước khi bắn tin đầu tiên</td>
+                </tr>
+                <tr>
+                  <td><code>group_interval: 10s</code></td>
+                  <td>Khoảng chờ trước khi gửi bản cập nhật nhóm có alert mới</td>
+                </tr>
+                <tr>
+                  <td><code>repeat_interval: 2h</code></td>
+                  <td>Khoảng thời gian nhắc lại nếu alert vẫn tiếp tục FIRING</td>
+                </tr>
+                <tr>
+                  <td><code>send_resolved: true</code></td>
+                  <td>Tự động gửi thông báo khi sự cố đã được khắc phục</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="card" style="border-color:rgba(188,76,0,.3);background:#fffdf7;padding:10px 14px;">
+              <div class="card-title text-orange" style="font-size:.8rem;">⚠️ Phân biệt chu kỳ điều khiển</div>
+              <div class="card-text" style="font-size:.73rem;line-height:1.45;">
+                Các khoảng thời gian trên điều khiển <strong>tần suất gửi thông báo</strong> của Alertmanager. Không
+                thay thế <code>scrape_interval</code>, <code>evaluation_interval</code> hay thời gian chờ
+                <code>for</code> trên Prometheus.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>27 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 27 — 5.3 Alerting Rules & Luồng trạng thái
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s27">
+      <div class="slide-header">Phần 5: Điều Phối Cảnh Báo Với Alertmanager</div>
+      <div class="slide-body">
+        <h2>5.3. Alerting Rules &amp; Luồng Trạng Thái Cảnh Báo</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <div>
+            <p style="font-size:.78rem;color:var(--text-2);margin-bottom:4px;"><strong
+                class="text-blue">/etc/prometheus/alert_rules.yml</strong></p>
+            <pre style="font-size:.68rem;line-height:1.5;">groups:
+  - name: WebServerInfrastructureAlerts
+    rules:
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes /
+          node_memory_MemTotal_bytes) * 100 > 80
+        for: 5s
+        labels:
+          severity: WARNING
+        annotations:
+          summary: "Cảnh báo dung lượng RAM!"
+          description: "RAM vượt ngưỡng 80%."
+
+# prometheus.yml — kết nối Alertmanager
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['localhost:9093']</pre>
+            <ul style="margin-top:6px;">
+              <li><code>expr</code> — Biểu thức PromQL xác định ngưỡng lỗi</li>
+              <li><code>for: 5s</code> — Lọc nhiễu (chống flapping tức thời)</li>
+              <li><code>labels</code> — Metadata dùng để định tuyến routing</li>
+              <li><code>annotations</code> — Tiêu đề &amp; mô tả hiển thị Telegram</li>
+            </ul>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <p style="font-size:.78rem;color:var(--text-2);margin-bottom:0;"><strong class="text-green">Vòng đời chuyển
+                trạng thái Alert (Lifecycle)</strong></p>
+            <!-- Lifecycle Diagram -->
+            <div class="dn" style="padding:12px 14px;gap:6px;">
+              <div class="dn-hflow" style="gap:8px;">
+                <div class="dn-node dim" style="padding:6px 12px;"><strong>INACTIVE</strong><br /><span
+                    style="font-size:.62rem;">Bình thường</span></div>
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <span class="dn-label" style="font-size:.58rem;">expr vi phạm</span>
+                  <span class="dn-arr">→</span>
+                </div>
+                <div class="dn-node orange" style="padding:6px 12px;"><strong>PENDING</strong><br /><span
+                    style="font-size:.62rem;">Đếm ngược for</span></div>
+                <div style="display:flex;flex-direction:column;align-items:center;">
+                  <span class="dn-label" style="font-size:.58rem;">đủ 5s</span>
+                  <span class="dn-arr">→</span>
+                </div>
+                <div class="dn-node red" style="padding:6px 12px;"><strong>FIRING</strong><br /><span
+                    style="font-size:.62rem;">Bắn cảnh báo</span></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;">
+                <span class="dn-arr" style="transform:rotate(180deg);">→</span>
+                <span class="dn-label" style="font-size:.62rem;color:var(--accent3);">RAM hạ &lt; 80% (Khôi phục)</span>
+                <div class="dn-node green" style="padding:4px 14px;font-size:.72rem;"><strong>RESOLVED</strong> (Thông
+                  báo hết sự cố)</div>
+              </div>
+            </div>
+            <div class="cards cards-2" style="margin-top:2px;">
+              <div class="card" style="border-color:rgba(188,76,0,.25);padding:10px 12px;">
+                <div class="card-title text-orange" style="font-size:.8rem;">⏳ Trạng thái PENDING</div>
+                <div class="card-text" style="font-size:.72rem;">Ngăn chặn cảnh báo rác khi tài nguyên chỉ tăng đột biến
+                  trong 1-2 giây rồi tự hạ.</div>
+              </div>
+              <div class="card" style="border-color:rgba(26,127,55,.25);padding:10px 12px;">
+                <div class="card-title text-green" style="font-size:.8rem;">✅ Trạng thái RESOLVED</div>
+                <div class="card-text" style="font-size:.72rem;">Báo cho kỹ sư biết hệ thống đã tự phục hồi mà không cần
+                  mở dashboard kiểm tra lại.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>28 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 28 — 5.4 Demo RAM cao & Phục hồi
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s28">
+      <div class="slide-header">Phần 5: Điều Phối Cảnh Báo Với Alertmanager</div>
+      <div class="slide-body">
+        <h2>5.4. Demo Thực Tế: Tạo Tải RAM &amp; Khôi Phục</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <div>
+            <pre style="font-size:.68rem;line-height:1.5;"># 1. Kiểm tra tính hợp lệ cú pháp trước
+promtool check rules /etc/prometheus/alert_rules.yml
+promtool check config /etc/prometheus/prometheus.yml
+amtool check-config /etc/alertmanager/alertmanager.yml
+
+# 2. Cài đặt công cụ và tạo tải 85% RAM trong 180s
+sudo apt install -y python3-psutil stress
+python3 auto_stress.py 85 180</pre>
+            <div class="card" style="border-color:rgba(26,127,55,.25);margin-top:10px;">
+              <div class="card-title text-green">✓ Chuỗi kiểm chứng thực nghiệm</div>
+              <div class="card-text" style="font-size:.73rem;line-height:1.45;">
+                Kiểm chứng khép kín: Phát hiện lỗi (Prometheus) → Gom nhóm &amp; lọc trùng (Alertmanager) → Gửi Telegram
+                → Tự động báo phục hồi khi tải kết thúc.
+              </div>
+            </div>
+          </div>
+          <div>
+            <table style="font-size:.76rem;">
+              <thead>
+                <tr>
+                  <th>Giai đoạn thực nghiệm</th>
+                  <th>Hiện tượng &amp; Kết quả quan sát</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>RAM vượt ngưỡng 80%</td>
+                  <td class="text-orange">Alert chuyển sang <strong>PENDING</strong> trên UI :9090</td>
+                </tr>
+                <tr>
+                  <td>Duy trì đủ <code>for: 5s</code></td>
+                  <td class="text-red">Alert chuyển sang <strong>FIRING</strong>; đẩy sang :9093</td>
+                </tr>
+                <tr>
+                  <td>Alertmanager xử lý</td>
+                  <td class="text-green">Telegram nhận tin <strong>🔥 CẢNH BÁO RAM &gt; 80%</strong></td>
+                </tr>
+                <tr>
+                  <td>Tải stress kết thúc (180s)</td>
+                  <td class="text-green">RAM hạ &lt; 80% → Telegram nhận tin <strong>✅ ĐÃ KHẮC PHỤC</strong></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="card" style="border-color:rgba(207,34,46,.25);margin-top:8px;background:#fff8f8;">
+              <div class="card-title text-red" style="font-size:.78rem;">⚠️ Giới hạn &amp; Lưu ý an toàn</div>
+              <div class="card-text" style="font-size:.71rem;">
+                <code>auto_stress.py</code> tính dung lượng cấp phát xấp xỉ; cần theo dõi VM để tránh kích hoạt Linux
+                Kernel <strong>OOM Killer</strong> tắt nhầm dịch vụ monitoring.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>29 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 29 — 5.5 Troubleshooting & Bảo mật
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s29">
+      <div class="slide-header">Phần 5: Điều Phối Cảnh Báo Với Alertmanager</div>
+      <div class="slide-body">
+        <h2>5.5. Xử Lý Sự Cố (Troubleshooting) &amp; An Toàn</h2>
+        <div class="two-col" style="flex:1;gap:16px;">
+          <div>
+            <table style="font-size:.73rem;">
+              <thead>
+                <tr>
+                  <th>Hiện tượng lỗi</th>
+                  <th>Điểm kiểm tra &amp; Khắc phục</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Telegram không nhận tin</td>
+                  <td>Kiểm tra Bot Token, Chat ID, DNS và kết nối internet</td>
+                </tr>
+                <tr>
+                  <td>Thiếu timestamp / nội dung</td>
+                  <td>Lỗi cú pháp Go Template; kiểm tra <code>.StartsAt</code></td>
+                </tr>
+                <tr>
+                  <td>Alert không lên FIRING</td>
+                  <td>Biểu thức PromQL chưa chạm ngưỡng, thời gian <code>for</code> quá dài</td>
+                </tr>
+                <tr>
+                  <td>Alertmanager không start</td>
+                  <td>Lỗi thụt lề YAML, cổng 9093 bị xung đột, kiểm tra journalctl</td>
+                </tr>
+                <tr>
+                  <td>Không có tin phục hồi</td>
+                  <td>Chưa bật cờ <code>send_resolved: true</code> trong config</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <pre style="font-size:.68rem;"># 1. Soi log hoạt động của Alertmanager
+sudo journalctl -u alertmanager -n 100 --no-pager
+
+# 2. Kiểm tra cổng lắng nghe dịch vụ
+sudo ss -tulpn | grep -E '9090|9093'
+
+# 3. Kiểm tra alert đang hoạt động qua CLI amtool
+amtool alert --alertmanager.url=http://localhost:9093</pre>
+            <div class="card" style="border-color:rgba(130,80,223,.25);">
+              <div class="card-title text-purple">🔒 Nguyên Tắc Bảo Mật Cảnh Báo</div>
+              <ul style="margin-top:4px;font-size:.75rem;">
+                <li><strong>Không commit secret:</strong> Bot Token và Chat ID phải dùng biến môi trường hoặc file riêng
+                  có <code>.gitignore</code></li>
+                <li><strong>Phân quyền file:</strong> Gán quyền <code>chmod 640</code> cho file
+                  <code>alertmanager.yml</code>
+                </li>
+                <li><strong>Cô lập mạng:</strong> Port 9093 chỉ bind localhost hoặc chỉ mở cho IP của
+                  <code>mon-server</code>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>30 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 30 — TỔNG KẾT
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s30">
+      <div class="slide-header">Tổng kết &amp; Bài học kinh nghiệm</div>
+      <div class="slide-body">
+        <h2>Tổng Kết &amp; Bài Học Kinh Nghiệm</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;">
+          <div class="card" style="border-color:rgba(9,105,218,.3);padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span
+                class="badge badge-blue">1</span>
+              <div class="card-title text-blue" style="font-size:.85rem;">Recording Rules</div>
+            </div>
+            <div class="card-text" style="font-size:.73rem;line-height:1.45;">Tập trung công thức, metric tính sẵn dùng
+              chung. Ưu tiên tính nhất quán và khả năng bảo trì. Đánh đổi: thêm chi phí tính toán &amp; không có lịch sử
+              hồi tố.</div>
+          </div>
+          <div class="card" style="border-color:rgba(26,127,55,.3);padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span
+                class="badge badge-green">2</span>
+              <div class="card-title text-green" style="font-size:.85rem;">HA &amp; LTS</div>
+            </div>
+            <div class="card-text" style="font-size:.73rem;line-height:1.45;">Active-Active Replicas triệt tiêu SPOF.
+              Deduplication thông minh bằng Fingerprint. Thanos + MinIO S3 mở rộng lưu trữ vô hạn với chi phí thấp.
+            </div>
+          </div>
+          <div class="card" style="border-color:rgba(130,80,223,.3);padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span
+                class="badge badge-purple">3</span>
+              <div class="card-title text-purple" style="font-size:.85rem;">Security &amp; Auth</div>
+            </div>
+            <div class="card-text" style="font-size:.73rem;line-height:1.45;">Phòng thủ đa tầng: TLS 1.3 → Basic Auth
+              bcrypt → RBAC Grafana → Khóa Admin API → UFW cô lập mạng. Chủ động bảo mật thay vì mặc định mở.</div>
+          </div>
+          <div class="card" style="border-color:rgba(188,76,0,.3);padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span
+                class="badge badge-orange">4</span>
+              <div class="card-title text-orange" style="font-size:.85rem;">GitOps &amp; MaC</div>
+            </div>
+            <div class="card-text" style="font-size:.73rem;line-height:1.45;">Chuyển dịch sang Monitoring-as-Code:
+              Grafana Provisioning + File SD + Script CI/CD. Bắt lỗi cú pháp trước khi nạp; khôi phục DR &lt; 30 giây.
+            </div>
+          </div>
+          <div class="card" style="border-color:rgba(207,34,46,.3);grid-column:1 / -1;padding:10px 14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><span
+                class="badge badge-red">5</span>
+              <div class="card-title text-red" style="font-size:.85rem;">Alertmanager &amp; Telegram</div>
+            </div>
+            <div class="card-text" style="font-size:.73rem;line-height:1.45;">Điều phối cảnh báo thông minh qua
+              Grouping, Deduplication và Routing. Thông báo Telegram HTML có ngữ cảnh, hỗ trợ tin báo phục hồi
+              (Resolved). Giảm tải Alert Fatigue và rút ngắn MTTD/MTTR.</div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>31 / 32</span></div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+     SLIDE 31 — CẢM ƠN / Q&A
+════════════════════════════════════════════════════════════════ -->
+    <div class="slide" id="s31">
+      <div class="slide-header">Q &amp; A</div>
+      <div class="slide-body center">
+        <h1 style="font-size:3rem;">CẢM ƠN THẦY<br />VÀ CÁC BẠN!</h1>
+        <h3 style="font-size:1.2rem;margin-top:8px;">Q &amp; A</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:22px;">
+          <span class="badge badge-blue" style="font-size:.85rem;padding:6px 16px;">Recording Rules</span>
+          <span class="badge badge-green" style="font-size:.85rem;padding:6px 16px;">HA &amp; LTS</span>
+          <span class="badge badge-purple" style="font-size:.85rem;padding:6px 16px;">Security &amp; Auth</span>
+          <span class="badge badge-orange" style="font-size:.85rem;padding:6px 16px;">GitOps &amp; MaC</span>
+          <span class="badge badge-red" style="font-size:.85rem;padding:6px 16px;">Alertmanager</span>
+        </div>
+        <p style="margin-top:18px;font-size:.84rem;">
+          <code>mon-server: 192.168.122.54</code> &nbsp;|&nbsp; <code>mon-target: 192.168.122.38</code>
+        </p>
+        <p style="margin-top:8px;color:var(--text-2);font-size:.78rem;">
+          KVM/libvirt · Debian 12 · Prometheus · Grafana · Alertmanager · Thanos · MinIO · Nginx
+        </p>
+      </div>
+      <div class="slide-footer"><span>Lab #10 · Prometheus | Grafana | Alertmanager | Thanos | MinIO |
+          Nginx</span><span>32 / 32</span></div>
+    </div>
+
+  </div><!-- #slideshow -->
+
+  <!-- Navigation -->
+  <div id="nav">
+    <button id="btn-prev" onclick="changeSlide(-1)" disabled>← Trước</button>
+    <span id="slide-counter">1 / 32</span>
+    <button id="btn-next" onclick="changeSlide(1)">Tiếp →</button>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const total = slides.length;
+    let current = 0;
+
+    function showSlide(idx) {
+      slides[current].classList.remove('active');
+      current = Math.max(0, Math.min(idx, total - 1));
+      slides[current].classList.add('active');
+      document.getElementById('slide-counter').textContent = `${current + 1} / ${total}`;
+      document.getElementById('btn-prev').disabled = current === 0;
+      document.getElementById('btn-next').disabled = current === total - 1;
+      document.getElementById('progress').style.width = `${(current / (total - 1)) * 100}%`;
+    }
+
+    function changeSlide(dir) { showSlide(current + dir); }
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); changeSlide(-1); }
+      if (e.key === 'Home') showSlide(0);
+      if (e.key === 'End') showSlide(total - 1);
+    });
+
+    let touchX = 0;
+    document.addEventListener('touchstart', e => touchX = e.changedTouches[0].screenX);
+    document.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].screenX - touchX;
+      if (Math.abs(dx) > 50) changeSlide(dx < 0 ? 1 : -1);
+    });
+
+    document.getElementById('progress').style.width = '0%';
+  </script>
+</body>
+
+</html>
