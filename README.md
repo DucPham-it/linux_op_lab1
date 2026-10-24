@@ -2,7 +2,8 @@
 ## Production Observability Stack: Prometheus, Grafana, Alertmanager & Node Exporter
 **Học phần / Chuyên đề:** Linux System Administration & Observability Engineering  
 **Hạ tầng thực nghiệm:** KVM/libvirt Debian 12 Minimal Cloud (`mon-server` & `mon-target`)  
-**Tài liệu học tập & Báo cáo:** [report.md](report.md) · [slide/slide.md](slide/slide.md) · [theory.md](theory.md)
+**Mã nguồn & Repository:** [https://github.com/DucPham-it/linux_op_lab1](https://github.com/DucPham-it/linux_op_lab1)  
+**Tài liệu học tập & Báo cáo:** [report/report.md](report/report.md) · [report/report.pdf](report/report.pdf) · [slide/slide.md](slide/slide.md) · [theory.md](theory.md)
 
 ---
 
@@ -11,10 +12,13 @@
 ```text
 Projects/Linux/Seminar/linux_op_lab1/
 ├── README.md                      # Hướng dẫn triển khai, kiểm thử và tổng quan hệ thống
-├── report.md                      # Báo cáo toàn diện đồ án (Lý thuyết, Setup, Demo, Mở rộng)
 ├── theory.md                      # Nền tảng lý thuyết cốt lõi (Pull vs Push, TSDB, Metrics, rate)
-├── slide/
-│   └── slide.md                   # Slide thuyết trình chuẩn Marp/Markdown Presentation
+├── report/                        # Báo cáo toàn diện đồ án (Markdown, Web HTML & PDF xuất bản)
+│   ├── report.md                  # Văn bản báo cáo kỹ thuật chi tiết toàn diện
+│   ├── report.html                # Bản dựng web động (hỗ trợ Mermaid SVG & KaTeX)
+│   └── report.pdf                 # Bản in PDF chính thức (56 trang chuẩn hóa định dạng)
+├── slide/                         # Slide thuyết trình hội thảo seminar
+│   └── slide.md                   # Slide trình chiếu chuẩn Marp/Markdown Presentation
 ├── extension_docs/                # Thư mục 5 chuyên đề nghiên cứu mở rộng nâng cao
 │   ├── ha_longterm_storage.md     # Mở rộng 1: Tính sẵn sàng cao (HA Replicas) & Thanos + MinIO LTS
 │   ├── production_alerting.md     # Mở rộng 2: Cảnh báo chuyên nghiệp, triệt tiêu alert, Telegram

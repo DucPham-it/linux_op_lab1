@@ -2,6 +2,7 @@
 ## Xây dựng Nền tảng Giám sát Chuẩn Production với Prometheus, Grafana, Alertmanager & Node Exporter trên Môi trường Linux
 **Học phần / Chuyên đề:** Linux System Administration & Observability Engineering  
 **Hạ tầng thực nghiệm:** Nền tảng KVM/libvirt Debian 12 (`mon-server` và `mon-target`)  
+**Mã nguồn & Repository:** [https://github.com/DucPham-it/linux_op_lab1](https://github.com/DucPham-it/linux_op_lab1)  
 
 > **Tổng quan:** Hệ thống giám sát sử dụng Prometheus và Grafana. Mở rộng để có thêm khả năng lưu trữ bền vững và tiết kiệm, thông báo chuyên nghiệp, bảo mật và xác thực, tối ưu hóa tính toán cho CPU và tự động hóa.
 
