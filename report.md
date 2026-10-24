@@ -1,7 +1,9 @@
 # BÁO CÁO TOÀN DIỆN VỀ HỆ THỐNG GIÁM SÁT VÀ CẢNH BÁO TỰ ĐỘNG
 ## Xây dựng Nền tảng Giám sát Chuẩn Production với Prometheus, Grafana, Alertmanager & Node Exporter trên Môi trường Linux
 **Học phần / Chuyên đề:** Linux System Administration & Observability Engineering  
-**Hạ tầng thực nghiệm:** Nền tảng KVM/libvirt Debian 12 (`mon-server` và `mon-target`)
+**Hạ tầng thực nghiệm:** Nền tảng KVM/libvirt Debian 12 (`mon-server` và `mon-target`)  
+
+> **Tổng quan:** Hệ thống giám sát sử dụng Prometheus và Grafana. Mở rộng để có thêm khả năng lưu trữ bền vững và tiết kiệm, thông báo chuyên nghiệp, bảo mật và xác thực, tối ưu hóa tính toán cho CPU và tự động hóa.
 
 ---
 
@@ -75,13 +77,37 @@ Trong kỷ nguyên điện toán đám mây và kiến trúc phân tán (Microse
 | **Tốc độ truy vấn** | Siêu nhanh, tổng hợp hàng triệu mẫu trong vài mili-giây qua PromQL. | Chậm hơn, yêu cầu đánh chỉ mục toàn văn (Full-text index) như Elasticsearch, OpenSearch, Loki. |
 
 ```mermaid
-flowchart LR
-    A["Hạ tầng & Ứng dụng"] -->|1. Thu thập Metrics định kỳ| B["Prometheus TSDB"]
-    A -->|2. Đẩy Logs sự kiện| C["Log Aggregator / Loki"]
-    B -->|Phát hiện ngưỡng bất thường| D["Alertmanager: Báo động Kỹ sư"]
-    B -->|Vẽ biểu đồ xu hướng| E["Grafana Dashboard"]
-    D -->|Kỹ sư nhận cảnh báo| F["Mở Grafana định vị Node lỗi"]
-    F -->|Dò chi tiết nguyên nhân| C
+flowchart TD
+    subgraph S1 ["Tầng Nguồn Dữ liệu (Infrastructure)"]
+        Target["Máy chủ Linux & Ứng dụng (mon-target)<br/>Phát sinh đồng thời dữ liệu số (Metrics) và nhật ký sự kiện (Logs)"]
+    end
+
+    subgraph S2 ["Tầng Thu thập & Lưu trữ Tập trung (Observability Engine)"]
+        direction LR
+        subgraph Stream_Metrics ["Trụ cột Metrics (Định lượng: 'Cái gì đang hỏng?')"]
+            Prom["Prometheus Server<br/>Cào số liệu định kỳ & TSDB Storage"]
+            Alert["Alertmanager<br/>Định tuyến & Bắn cảnh báo tức thì"]
+            Prom -->|"Phát hiện vượt ngưỡng"| Alert
+        end
+
+        subgraph Stream_Logs ["Trụ cột Logs (Định tính: 'Tại sao lại hỏng?')"]
+            Loki["Log Aggregator (Loki/Promtail)<br/>Thu gom dòng log & Phân tích chuyên sâu"]
+        end
+
+        Stream_Metrics ~~~ Stream_Logs
+    end
+
+    subgraph S3 ["Tầng Vận hành & Khắc phục Sự cố (Unified Operations Cockpit)"]
+        Grafana["Grafana Operations Dashboard<br/>Trực quan hóa đồ thị Metrics kết hợp tra cứu dòng Log trên cùng một màn hình"]
+        Engineer["Kỹ sư Vận hành (SRE/DevOps)<br/>Nhận cảnh báo khẩn và định vị nguyên nhân gốc trong vài phút"]
+        Grafana --- Engineer
+    end
+
+    Target ==>|"Scrape Metrics mỗi 5s"| Prom
+    Target ==>|"Đẩy Logs sự kiện"| Loki
+    Prom -.->|"Truy vấn số liệu PromQL"| Grafana
+    Loki -.->|"Truy vết nhật ký LogQL"| Grafana
+    Alert ==>|"Bắn tin Telegram khẩn"| Engineer
 ```
 
 ---
@@ -125,13 +151,21 @@ Việc triển khai một hệ thống Giám sát & Ghi log tự động mang l�
 ### 4.1. Mô hình Kéo (Pull) so với Mô hình Đẩy (Push)
 
 ```mermaid
-flowchart TD
-    subgraph Pull_Model ["Mô hình Pull - Prometheus"]
-        Server1["Prometheus Server"] -->|HTTP GET /metrics định kỳ| Target1["Node Exporter :9100"]
-        Server1 -.->|Không phản hồi: up=0| Target1
+flowchart LR
+    subgraph Pull_Model ["Mô hình Kéo (Pull) - Chuẩn Prometheus"]
+        direction TB
+        P_Server["Prometheus Server<br/>(Chủ động kết nối cào dữ liệu)"]
+        P_Target["Target: Node Exporter :9100<br/>(Chỉ phơi endpoint /metrics)"]
+        P_Server -->|"1. HTTP GET /metrics định kỳ"| P_Target
+        P_Server -.->|"2. Timeout / Không phản hồi: up=0"| P_Target
     end
-    subgraph Push_Model ["Mô hình Push - Graphite/Telegraf"]
-        Agent2["Push Agent"] -->|Gửi dữ liệu dồn dập| Server2["Central InfluxDB/Graphite"]
+
+    subgraph Push_Model ["Mô hình Đẩy (Push) - Truyền thống"]
+        direction TB
+        Agent["Push Agent trên Máy trạm<br/>(Chủ động đẩy dữ liệu ra ngoài)"]
+        Central["Central Server (Graphite / InfluxDB)<br/>(Bị động tiếp nhận dữ liệu)"]
+        Agent -->|"Gửi dữ liệu dồn dập liên tục"| Central
+        Central -.->|"Rủi ro quá tải khi quy mô mở rộng"| Central
     end
 ```
 
@@ -143,7 +177,7 @@ flowchart TD
 | Tiêu chí | Mô hình Pull (Prometheus) | Mô hình Push truyền thống |
 | :--- | :--- | :--- |
 | **Kiểm soát tần suất** | Server tập trung quyết định chu kỳ cào, tránh nghẽn. | Từng agent quyết định; rủi ro server bị quá tải khi quy mô lớn. |
-| **Phát hiện máy chủ sập** | **Cực kỳ trực quan:** Scrape thất bại $\rightarrow$ Prometheus tự động gán nhãn `up = 0`. | **Khó khăn:** Không nhận được dữ liệu có thể do agent chết, hoặc do agent chưa có gì để gửi. |
+| **Phát hiện máy chủ sập** | **Cực kỳ trực quan:** Scrape thất bại → Prometheus tự động gán nhãn `up = 0`. | **Khó khăn:** Không nhận được dữ liệu có thể do agent chết, hoặc do agent chưa có gì để gửi. |
 | **Gỡ lỗi (Debugging)** | Dễ dàng kiểm tra bằng `curl http://target:9100/metrics`. | Phải soi log cục bộ của từng agent trên từng máy chủ. |
 | **Cấu hình trên Agent** | Đơn giản: Agent không cần biết địa chỉ IP của server giám sát. | Phức tạp: Mỗi agent phải cấu hình địa chỉ IP/domain của trung tâm. |
 | **Vấn đề NAT / Firewall** | Cần giải pháp Ingress / Proxy nếu target nằm sâu trong mạng kín. | Dễ đi qua firewall vì agent chủ động mở kết nối ra ngoài. |
@@ -194,28 +228,32 @@ Prometheus không dùng các cơ sở dữ liệu quan hệ như PostgreSQL hay 
 Toàn bộ hệ thống thực nghiệm trong đề tài được thiết kế theo mô hình phân tán 2 máy ảo độc lập, tái hiện sát với kiến trúc hạ tầng thực tế của doanh nghiệp:
 
 ```mermaid
-graph LR
-    subgraph Host_Machine ["Host Machine (Linux / KVM Hypervisor)"]
-        subgraph Bridge_Network ["Virtual Network: default (virbr0: 192.168.122.0/24)"]
-            
-            subgraph VM_Server ["VM 1: mon-server (1.5GB RAM, 1 vCPU)"]
-                Prometheus["Prometheus (:9090)<br>TSDB Engine"]
-                Alertmanager["Alertmanager (:9093)<br>Router & Dispatcher"]
-                Grafana["Grafana (:3000)<br>Visual Dashboard"]
-            end
-            
-            subgraph VM_Target ["VM 2: mon-target (512MB RAM, 1 vCPU)"]
-                NodeExporter["Node Exporter (:9100)<br>OS Metrics Collector"]
-                StressTool["stress-ng & auto_stress.py<br>Load Generators"]
-            end
-            
+flowchart TD
+    subgraph KVM_Env ["Hạ tầng Ảo hóa KVM/libvirt (Mạng NAT: 192.168.122.0/24 virbr0)"]
+        direction LR
+        subgraph VM_Server ["VM 1: mon-server (192.168.122.100) — Trung tâm Giám sát"]
+            direction TB
+            Grafana["Grafana Dashboard (:3000)<br/>Trực quan hóa đồ thị & bảng điều khiển"]
+            Prometheus["Prometheus Server (:9090)<br/>TSDB Engine & Đánh giá Rule"]
+            Alertmanager["Alertmanager (:9093)<br/>Gom cụm, triệt tiêu & định tuyến cảnh báo"]
+
+            Grafana -->|"Truy vấn PromQL"| Prometheus
+            Prometheus -->|"Bắn Alert vượt ngưỡng"| Alertmanager
         end
+
+        subgraph VM_Target ["VM 2: mon-target (192.168.122.38) — Máy chủ Mục tiêu"]
+            direction TB
+            NodeExporter["Node Exporter (:9100)<br/>Thu thập CPU, RAM, Disk, Mạng"]
+            StressTool["Bộ Sinh Tải Thực nghiệm<br/>stress-ng & auto_stress.py"]
+            StressTool -.->|"Gây áp lực tài nguyên"| NodeExporter
+        end
+
+        VM_Server ~~~ VM_Target
+        Prometheus ==>|"Scrape metrics định kỳ mỗi 5 giây"| NodeExporter
     end
-    
-    Prometheus -->|Scrape metrics mỗi 5s| NodeExporter
-    Prometheus -->|Bắn cảnh báo khi vượt ngưỡng| Alertmanager
-    Grafana -->|Truy vấn PromQL| Prometheus
-    Alertmanager -->|Gửi cảnh báo HTML| TelegramBot["Telegram Bot Channel"]
+
+    TelegramBot["Telegram Bot Channel (Kỹ sư Vận hành SRE)"]
+    Alertmanager ==>|"Gửi cảnh báo sự cố khẩn cấp (HTML)"| TelegramBot
 ```
 
 ### Thông số kỹ thuật của các nút:
@@ -418,9 +456,9 @@ sudo systemctl enable prometheus prometheus-alertmanager grafana-server
 ## 6. Kết nối Data Source và Trực quan hóa trên Grafana
 
 1. Truy cập giao diện Web của Grafana tại địa chỉ: `http://192.168.122.100:3000` (Tài khoản mặc định: `admin` / `admin`).
-2. Vào **Connections** $\rightarrow$ **Data Sources** $\rightarrow$ Chọn **Prometheus**.
-3. Điền URL: `http://127.0.0.1:9090` $\rightarrow$ Nhấn **Save & Test** (Hiển thị thông báo *"Data source is working"* màu xanh).
-4. Vào mục **Dashboards** $\rightarrow$ **New** $\rightarrow$ **Import** $\rightarrow$ Nhập ID Dashboard cộng đồng `1860` (**Node Exporter Full**) $\rightarrow$ Chọn Data Source là `Prometheus` vừa tạo $\rightarrow$ Nhấn **Import**.
+2. Vào **Connections** → **Data Sources** → Chọn **Prometheus**.
+3. Điền URL: `http://127.0.0.1:9090` → Nhấn **Save & Test** (Hiển thị thông báo *"Data source is working"* màu xanh).
+4. Vào mục **Dashboards** → **New** → **Import** → Nhập ID Dashboard cộng đồng `1860` (**Node Exporter Full**) → Chọn Data Source là `Prometheus` vừa tạo → Nhấn **Import**.
 5. Toàn bộ thông số sống còn của `mon-target` (CPU, Memory, Disk I/O, Network Traffic) lập tức được hiển thị trực quan và cập nhật mỗi 5 giây.
 
 ---
@@ -849,7 +887,7 @@ if __name__ == "__main__":
     auto_stress(target, dur)
 ```
 
-### 7.2. Kịch bản Thực nghiệm 1: Vòng đời Alert (Pending $\rightarrow$ Firing $\rightarrow$ Resolved)
+### 7.2. Kịch bản Thực nghiệm 1: Vòng đời Alert (Pending → Firing → Resolved)
 
 ```mermaid
 sequenceDiagram
@@ -1130,19 +1168,30 @@ Trong thực tế, một bảng điều khiển Grafana gồm nhiều đồ th�
 **Recording Rules** cho phép Prometheus định kỳ tính toán trước (pre-compute) các biểu thức PromQL nặng và lưu kết quả thành một **metric mới hoàn toàn** trong TSDB:
 
 ```mermaid
-flowchart TD
-    subgraph Traditional_Workflow ["Trước khi có Recording Rules"]
-        RawTSDB[("Raw Metrics: node_cpu_seconds_total")] -->|Quét hàng triệu mẫu thô mỗi 5s| QueryEngine["PromQL Engine"]
-        QueryEngine -->|Tính toán nặng| Grafana1["Grafana Dashboard"]
-        QueryEngine -->|Tính toán nặng| AlertEngine["Alerting Engine"]
+flowchart LR
+    subgraph Traditional ["Quy trình Cũ: Chưa có Recording Rules"]
+        direction TB
+        Raw1[("Dữ liệu Thô (Raw TSDB)<br/>node_cpu_seconds_total")]
+        Engine1["PromQL Query Engine<br/>Tính toán lặp lại biểu thức nặng"]
+        Clients1["Grafana & Alertmanager<br/>Quét hàng triệu mẫu mỗi 5s<br/>(CPU quá tải, phản hồi chậm)"]
+
+        Raw1 -->|"Quét hàng triệu mẫu thô"| Engine1
+        Engine1 -->|"Tính toán nặng tốn CPU"| Clients1
     end
 
-    subgraph Optimized_Workflow ["Sau khi triển khai Recording Rules"]
-        RawTSDB2[("Raw Metrics")] -->|Prometheus tính trước mỗi 15s| RecordRule["Recording Rule: instance:cpu_usage:percent"]
-        RecordRule -->|Lưu kết quả mới vào TSDB| NewTSDB[("Pre-computed Series")]
-        NewTSDB -->|Đọc tức thì trong 1ms| Grafana2["Grafana Dashboard"]
-        NewTSDB -->|Đọc tức thì trong 1ms| AlertEngine2["Alerting Engine"]
+    subgraph Optimized ["Quy trình Mới: Đã có Recording Rules"]
+        direction TB
+        Raw2[("Dữ liệu Thô (Raw TSDB)")]
+        Rule["Background Recording Rule<br/>instance:cpu_usage:percent<br/>(Prometheus tính trước mỗi 15s)"]
+        PreTSDB[("Metric Đã Tính Sẵn (Pre-computed)<br/>Lưu kết quả mới vào TSDB")]
+        Clients2["Grafana & Alertmanager<br/>Truy vấn chuỗi đã tính sẵn<br/>(Thời gian phản hồi < 1ms)"]
+
+        Raw2 -->|"Định kỳ tính trước 15s"| Rule
+        Rule -->|"Lưu chuỗi mới vào TSDB"| PreTSDB
+        PreTSDB -->|"Đọc tức thì < 1ms"| Clients2
     end
+
+    Traditional ~~~ Optimized
 ```
 
 ### 2.2. Chuẩn mực Đặt tên Metric (Naming Convention)
@@ -1241,21 +1290,34 @@ Bộ máy lưu trữ chuỗi thời gian (TSDB) của Prometheus được thiế
 
 ```mermaid
 flowchart TD
-    Scrape["Scrape Loop: Mẫu Metric Mới"] -->|1. Ghi tuần tự ra đĩa| WAL["Write-Ahead Log / WAL"]
-    Scrape -->|2. Nạp vào bộ nhớ nhanh| HeadMem["Head Block: In-Memory Chunks"]
-    
-    HeadMem -->|Đủ 120 mẫu / 2 giờ| MemMapped["Memory-Mapped Chunks on Disk"]
-    MemMapped -->|Chu kỳ Compaction 2 giờ| BlockDir["2-Hour Block Directory (Bất biến)"]
-    
-    subgraph Block_Structure ["Cấu trúc 1 Thư mục Block (UUID/):"]
-        Meta["meta.json: Thống kê & Chu kỳ thời gian"]
-        Index["index: Chỉ mục Bitmap tìm kiếm nhãn siêu tốc"]
-        Chunks["chunks/000001: Dữ liệu nén XOR / Gorilla"]
-        Tombstone["tombstones: Bản ghi đánh dấu xóa logic"]
+    subgraph Ingestion ["Giai đoạn 1: Thu nhận & Bộ nhớ Tạm (RAM & WAL)"]
+        direction LR
+        Scrape["Scrape Loop<br/>(Mẫu Metric Mới)"]
+        WAL["Write-Ahead Log (WAL)<br/>(Ghi tuần tự an toàn ra đĩa)"]
+        Head["Head Block (In-Memory)<br/>(Lưu RAM phục vụ truy vấn)"]
+        Scrape ==>|"Ghi an toàn"| WAL
+        Scrape ==>|"Nạp bộ nhớ"| Head
     end
-    
-    BlockDir --> Block_Structure
-    Block_Structure -->|Cũ hơn retention.time / retention.size| Cleaner["Tự động xóa dọn dẹp theo FIFO"]
+
+    subgraph Storage ["Giai đoạn 2: Đóng băng & Cấu trúc Khối Đĩa Bất biến (data/UUID/)"]
+        direction LR
+        MM["Memory-Mapped Chunks<br/>(Ánh xạ bộ nhớ đệm)"]
+        
+        subgraph Block_Files ["Cấu trúc 1 Thư mục Block (UUID/)"]
+            direction TB
+            F1["meta.json (chu kỳ thời gian)"]
+            F2["index (Chỉ mục Bitmap)"]
+            F3["chunks/ (Dữ liệu nén Gorilla)"]
+            F4["tombstones (Bản ghi xóa logic)"]
+        end
+
+        Cleaner["Retention Engine<br/>(Dọn dẹp FIFO theo time/size)"]
+
+        MM ==>|"Compactor nén 2h"| Block_Files
+        Block_Files ==>|"Cũ hơn retention"| Cleaner
+    end
+
+    Head ==>|"Đủ 120 mẫu / 2 giờ"| MM
 ```
 
 #### Giải thích cấu trúc thư mục Block trên đĩa (`/var/lib/prometheus/data/`):
@@ -1355,7 +1417,7 @@ flowchart LR
 
 #### Bảng Quy chuẩn Tương quan Chu kỳ Scrape và Range Vector:
 
-| Chu kỳ cào dữ liệu (`scrape_interval`) | Cửa sổ tối thiểu lý thuyết ($2\times$) | Cửa sổ Production Khuyến nghị ($4\times - 12\times$) |
+| Chu kỳ cào dữ liệu (`scrape_interval`) | Cửa sổ tối thiểu lý thuyết (2×) | Cửa sổ Production Khuyến nghị (4× - 12×) |
 | :--- | :--- | :--- |
 | **5 giây** (`5s`) | `[10s]` | **`[1m]`** (Chứa ~12 mẫu đo, triệt tiêu nhiễu giật cục) |
 | **15 giây** (`15s`) | `[30s]` | **`[2m]`** (Chứa ~8 mẫu đo) |

@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Báo Cáo Lab 1 - Linux System Administration & Observability Engineering</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'default',
+      securityLevel: 'loose',
+      themeVariables: {
+        fontSize: '18px',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        edgeLabelBackground: '#ffffff',
+        clusterBkg: '#f8fafc',
+        nodeBorder: '#2563eb',
+        mainBkg: '#eff6ff'
+      },
+      flowchart: {
+        useMaxWidth: false,
+        htmlLabels: true,
+        curve: 'basis',
+        nodeSpacing: 45,
+        rankSpacing: 50
+      }
+    });
+
+    window.addEventListener('load', () => {
+      if (window.renderMathInElement) {
+        renderMathInElement(document.body, {
+          delimiters: [
+            {left: '14096', right: '14096', display: true},
+            {left: '$', right: '$', display: false}
+          ],
+          throwOnError: false
+        });
+      }
+      setTimeout(() => {
+        document.querySelectorAll('.mermaid svg').forEach(svg => {
+          svg.style.width = '100%';
+          svg.style.maxWidth = '100%';
+          svg.style.height = 'auto';
+        });
+      }, 600);
+    });
+  </script>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 12mm 18mm 12mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.65;
+      color: #1f2937;
+      background: #ffffff;
+      padding: 0;
+      margin: 0;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      color: #111827;
+      font-weight: 700;
+      line-height: 1.3;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    h1 {
+      font-size: 20pt;
+      border-bottom: 2.5px solid #2563eb;
+      padding-bottom: 8px;
+      margin-top: 2em;
+      margin-bottom: 0.8em;
+      color: #1e40af;
+    }
+    h2 {
+      font-size: 15pt;
+      border-bottom: 1.5px solid #e5e7eb;
+      padding-bottom: 5px;
+      margin-top: 1.6em;
+      margin-bottom: 0.6em;
+      color: #1f2937;
+    }
+    h3 {
+      font-size: 13pt;
+      margin-top: 1.3em;
+      margin-bottom: 0.5em;
+      color: #374151;
+    }
+    h4 {
+      font-size: 11.5pt;
+      margin-top: 1.1em;
+      margin-bottom: 0.4em;
+    }
+    p, ul, ol {
+      margin-top: 0.4em;
+      margin-bottom: 0.8em;
+    }
+    ul, ol {
+      padding-left: 1.6em;
+    }
+    li {
+      margin-bottom: 0.3em;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid #d1d5db;
+      margin: 2.2em 0;
+    }
+    code {
+      font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, monospace;
+      font-size: 0.95em;
+      background-color: #f1f5f9;
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: #c026d3;
+      font-weight: 500;
+    }
+    .cmd-box {
+      position: relative;
+      margin: 1.2em 0;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      background-color: #f8fafc;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    .lang-badge {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: #e2e8f0;
+      color: #475569;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-bottom-left-radius: 6px;
+      border-left: 1px solid #cbd5e1;
+      border-bottom: 1px solid #cbd5e1;
+      letter-spacing: 0.05em;
+    }
+    pre {
+      font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, monospace;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      padding: 16px 20px;
+      margin: 0;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    pre code {
+      background-color: transparent !important;
+      padding: 0 !important;
+      border-radius: 0 !important;
+      color: inherit;
+      font-weight: normal;
+    }
+    .mermaid-wrap {
+      text-align: center;
+      margin: 2em auto;
+      background-color: #fafbfc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 20px 16px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+    .mermaid svg {
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.4em 0;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 9px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #f1f5f9;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    blockquote {
+      margin: 1.2em 0;
+      padding: 0.6em 1.2em;
+      color: #374151;
+      border-left: 4.5px solid #2563eb;
+      background-color: #eff6ff;
+      border-radius: 0 6px 6px 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .katex-display {
+      margin: 1.2em 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    pre { line-height: 125%; }
+td.linenos .normal { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #666666; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f0f0f0; }
+.highlight .c { color: #60A0B0; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #007020; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #60A0B0; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #60A0B0; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #007020 } /* Comment.Preproc */
+.highlight .cpf { color: #60A0B0; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #60A0B0; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #60A0B0; background-color: #FFF0F0 } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #F00 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #00A000 } /* Generic.Inserted */
+.highlight .go { color: #888 } /* Generic.Output */
+.highlight .gp { color: #C65D09; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #007020; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #007020; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #007020; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #007020 } /* Keyword.Pseudo */
+.highlight .kr { color: #007020; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #902000 } /* Keyword.Type */
+.highlight .m { color: #40A070 } /* Literal.Number */
+.highlight .s { color: #4070A0 } /* Literal.String */
+.highlight .na { color: #4070A0 } /* Name.Attribute */
+.highlight .nb { color: #007020 } /* Name.Builtin */
+.highlight .nc { color: #0E84B5; font-weight: bold } /* Name.Class */
+.highlight .no { color: #60ADD5 } /* Name.Constant */
+.highlight .nd { color: #555; font-weight: bold } /* Name.Decorator */
+.highlight .ni { color: #D55537; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #007020 } /* Name.Exception */
+.highlight .nf { color: #06287E } /* Name.Function */
+.highlight .nl { color: #002070; font-weight: bold } /* Name.Label */
+.highlight .nn { color: #0E84B5; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #062873; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #BB60D5 } /* Name.Variable */
+.highlight .ow { color: #007020; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #40A070 } /* Literal.Number.Bin */
+.highlight .mf { color: #40A070 } /* Literal.Number.Float */
+.highlight .mh { color: #40A070 } /* Literal.Number.Hex */
+.highlight .mi { color: #40A070 } /* Literal.Number.Integer */
+.highlight .mo { color: #40A070 } /* Literal.Number.Oct */
+.highlight .sa { color: #4070A0 } /* Literal.String.Affix */
+.highlight .sb { color: #4070A0 } /* Literal.String.Backtick */
+.highlight .sc { color: #4070A0 } /* Literal.String.Char */
+.highlight .dl { color: #4070A0 } /* Literal.String.Delimiter */
+.highlight .sd { color: #4070A0; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #4070A0 } /* Literal.String.Double */
+.highlight .se { color: #4070A0; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #4070A0 } /* Literal.String.Heredoc */
+.highlight .si { color: #70A0D0; font-style: italic } /* Literal.String.Interpol */
+.highlight .sx { color: #C65D09 } /* Literal.String.Other */
+.highlight .sr { color: #235388 } /* Literal.String.Regex */
+.highlight .s1 { color: #4070A0 } /* Literal.String.Single */
+.highlight .ss { color: #517918 } /* Literal.String.Symbol */
+.highlight .bp { color: #007020 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #06287E } /* Name.Function.Magic */
+.highlight .vc { color: #BB60D5 } /* Name.Variable.Class */
+.highlight .vg { color: #BB60D5 } /* Name.Variable.Global */
+.highlight .vi { color: #BB60D5 } /* Name.Variable.Instance */
+.highlight .vm { color: #BB60D5 } /* Name.Variable.Magic */
+.highlight .il { color: #40A070 } /* Literal.Number.Integer.Long */
+  </style>
+</head>
+<body>
+<h1>BÁO CÁO TOÀN DIỆN VỀ HỆ THỐNG GIÁM SÁT VÀ CẢNH BÁO TỰ ĐỘNG</h1>
+<h2>Xây dựng Nền tảng Giám sát Chuẩn Production với Prometheus, Grafana, Alertmanager &amp; Node Exporter trên Môi trường Linux</h2>
+<p><strong>Học phần / Chuyên đề:</strong> Linux System Administration &amp; Observability Engineering<br />
+<strong>Hạ tầng thực nghiệm:</strong> Nền tảng KVM/libvirt Debian 12 (<code>mon-server</code> và <code>mon-target</code>)</p>
+<blockquote>
+<p><strong>Tổng quan:</strong> Hệ thống giám sát sử dụng Prometheus và Grafana. Mở rộng để có thêm khả năng lưu trữ bền vững và tiết kiệm, thông báo chuyên nghiệp, bảo mật và xác thực, tối ưu hóa tính toán cho CPU và tự động hóa.</p>
+</blockquote>
+<hr />
+<h1>MỤC LỤC TỔNG QUAN</h1>
+<ul>
+<li><a href="#i-overview-brief-introduction-of-monitoring-and-logging-the-need-of-that-and-why-we-chose-this-topic">I. Overview: Brief Introduction of Monitoring and Logging, the Need of That and Why We Chose This Topic</a>
+<ul>
+<li><a href="#1-kh%C3%A1i-ni%E1%BB%87m-v%C3%A0-b%E1%BB%91i-c%E1%BA%A3nh-observability-kh%E1%BA%A3-n%C4%83ng-quan-s%C3%A1t">1. Khái niệm và Bối cảnh Observability (Khả năng quan sát)</a></li>
+<li><a href="#2-s%E1%BB%B1-c%E1%BA%A7n-thi%E1%BA%BFt-c%E1%BB%A7a-gi%C3%A1m-s%C3%A1t-v%C3%A0-ghi-log-trong-v%E1%BA%ADn-h%C3%A0nh-hi%E1%BB%87n-%C4%91%E1%BA%A1i">2. Sự cần thiết của Giám sát và Ghi log trong Vận hành Hiện đại</a></li>
+<li><a href="#3-l%C3%BD-do-l%E1%BB%B1a-ch%E1%BB%8Dn-%C4%91%E1%BB%81-t%C3%A0i-why-we-chose-this-topic">3. Lý do lựa chọn Đề tài (Why We Chose This Topic)</a></li>
+<li><a href="#4-n%E1%BB%81n-t%E1%BA%A3ng-l%C3%BD-thuy%E1%BA%BFt-c%E1%BB%91t-l%C3%B5i-v%E1%BB%81-prometheus--time-series-data">4. Nền tảng Lý thuyết Cốt lõi về Prometheus &amp; Time Series Data</a></li>
+</ul>
+</li>
+<li><a href="#ii-set-up-the-environment">II. Set Up the Environment</a>
+<ul>
+<li><a href="#1-ki%E1%BA%BFn-tr%C3%BAc-m%C3%B4-h%C3%ACnh-th%E1%BB%B1c-nghi%E1%BB%87m-ph%C3%A2n-t%C3%A1n">1. Kiến trúc Mô hình Thực nghiệm Phân tán</a></li>
+<li><a href="#2-thi%E1%BA%BFt-l%E1%BA%ADp-m%C3%B4i-tr%C6%B0%E1%BB%9Dng-host-kvmlibvirt-tr%C3%AAn-arch-linux-fedora-virtualbox">2. Thiết lập Môi trường Host (KVM/libvirt trên Arch Linux, Fedora, VirtualBox)</a></li>
+<li><a href="#3-c%E1%BA%A5p-ph%C3%A1t-m%C3%A1y-%E1%BA%A3o-t%E1%BB%B1-%C4%91%E1%BB%99ng-b%E1%BA%B1ng-cloud-init-v%C3%A0-cow-overlay-disk">3. Cấp phát Máy ảo Tự động bằng Cloud-Init và CoW Overlay Disk</a></li>
+<li><a href="#4-c%E1%BA%A5u-h%C3%ACnh-m%C3%A1y-%E1%BA%A3o-m%E1%BB%A5c-ti%C3%AAu-target-vm---mon-target">4. Cấu hình Máy ảo Mục tiêu (Target VM - <code>mon-target</code>)</a></li>
+<li><a href="#5-c%C3%A0i-%C4%91%E1%BA%B7t-v%C3%A0-c%E1%BA%A5u-h%C3%ACnh-m%C3%A1y-ch%E1%BB%A7-gi%C3%A1m-s%C3%A1t-monitoring-server---mon-server">5. Cài đặt và Cấu hình Máy chủ Giám sát (Monitoring Server - <code>mon-server</code>)</a></li>
+<li><a href="#6-k%E1%BA%BFt-n%E1%BB%91i-data-source-v%C3%A0-tr%E1%BB%B1c-quan-h%C3%B3a-tr%C3%AAn-grafana">6. Kết nối Data Source và Trực quan hóa trên Grafana</a></li>
+</ul>
+</li>
+<li><a href="#iii-ha--long-term-storage">III. HA &amp; Long-term Storage</a>
+<ul>
+<li><a href="#1-%C4%91%E1%BA%B7t-v%E1%BA%A5n-%C4%91%E1%BB%81-v%C3%A0-th%C3%A1ch-th%E1%BB%A9c-l%C6%B0u-tr%E1%BB%AF-c%E1%BB%A7a-prometheus-local-tsdb">1. Đặt vấn đề và Thách thức Lưu trữ của Prometheus Local TSDB</a></li>
+<li><a href="#2-chi%E1%BA%BFn-l%C6%B0%E1%BB%A3c-t%E1%BB%91i-%C6%B0u-h%C3%B3a-local-storage--retention">2. Chiến lược Tối ưu hóa Local Storage &amp; Retention</a></li>
+<li><a href="#3-ki%E1%BA%BFn-tr%C3%BAc-high-availability-ha-replicas-active-active">3. Kiến trúc High Availability (HA Replicas) Active-Active</a></li>
+<li><a href="#4-l%C6%B0u-tr%E1%BB%AF-d%C3%A0i-h%E1%BA%A1n-lts-v%E1%BB%9Bi-thanos-sidecar-v%C3%A0-minio-object-storage">4. Lưu trữ Dài hạn (LTS) với Thanos Sidecar và MinIO Object Storage</a></li>
+<li><a href="#5-k%E1%BB%8Bch-b%E1%BA%A3n-ki%E1%BB%83m-ch%E1%BB%A9ng-t%C3%ADnh-s%E1%BA%B5n-s%C3%A0ng-v%C3%A0-failover">5. Kịch bản Kiểm chứng Tính sẵn sàng và Failover</a></li>
+</ul>
+</li>
+<li><a href="#iv-production-alerting">IV. Production Alerting</a>
+<ul>
+<li><a href="#1-tri%E1%BA%BFt-l%C3%BD-v%E1%BA%ADn-h%C3%A0nh-v%C3%A0-hi%E1%BB%87n-t%C6%B0%E1%BB%A3ng-b%C3%A3o-c%E1%BA%A3nh-b%C3%A1o-alert-fatigue">1. Triết lý Vận hành và Hiện tượng &quot;Bão cảnh báo&quot; (Alert Fatigue)</a></li>
+<li><a href="#2-ki%E1%BA%BFn-tr%C3%BAc-c%E1%BA%A3nh-b%C3%A1o-3-l%E1%BB%9Bp-detection---processing---notification">2. Kiến trúc Cảnh báo 3 Lớp (Detection - Processing - Notification)</a></li>
+<li><a href="#3-qu%E1%BA%A3n-l%C3%BD-xung-%C4%91%E1%BB%99t-c%E1%BB%95ng-v%C3%A0-d%E1%BB%8Bch-v%E1%BB%A5-systemd-alertmanager">3. Quản lý Xung đột Cổng và Dịch vụ Systemd Alertmanager</a></li>
+<li><a href="#4-c%C6%A1-ch%E1%BA%BF-n%C3%A2ng-cao-gom-c%E1%BB%A5m-grouping-v%C3%A0-tri%E1%BB%87t-ti%C3%AAu-inhibition">4. Cơ chế Nâng cao: Gom cụm (Grouping) và Triệt tiêu (Inhibition)</a></li>
+<li><a href="#5-thi%E1%BA%BFt-k%E1%BA%BF-m%E1%BA%ABu-th%C3%B4ng-b%C3%A1o-telegram-html-v%C3%A0-s%E1%BB%ADa-l%E1%BB%97i-timestamp">5. Thiết kế Mẫu thông báo Telegram HTML và Sửa lỗi Timestamp</a></li>
+<li><a href="#6-chu%E1%BA%A9n-h%C3%B3a-alerting-rules-v%C3%A0-kh%E1%BA%AFc-ph%E1%BB%A5c-sai-l%E1%BB%87ch-c%C3%B4ng-th%E1%BB%A9c-ram">6. Chuẩn hóa Alerting Rules và Khắc phục Sai lệch Công thức RAM</a></li>
+<li><a href="#7-b%E1%BB%99-c%C3%B4ng-c%E1%BB%A5-ki%E1%BB%83m-th%E1%BB%AD-t%E1%BB%B1-%C4%91%E1%BB%99ng-v%C3%A0-k%E1%BB%8Bch-b%E1%BA%A3n-demo-th%E1%BB%B1c-t%E1%BA%BF">7. Bộ công cụ Kiểm thử Tự động và Kịch bản Demo Thực tế</a></li>
+</ul>
+</li>
+<li><a href="#v-security-and-auth">V. Security and Auth</a>
+<ul>
+<li><a href="#1-m%C3%B4-h%C3%ACnh-%C4%91e-d%E1%BB%8Da-an-ninh-threat-model-%C4%91%E1%BB%91i-v%E1%BB%9Bi-h%E1%BB%87-th%E1%BB%91ng-monitoring">1. Mô hình Đe dọa An ninh (Threat Model) đối với Hệ thống Monitoring</a></li>
+<li><a href="#2-m%C3%A3-h%C3%B3a-%C4%91%C6%B0%E1%BB%9Dng-truy%E1%BB%81n-to%C3%A0n-di%E1%BB%87n-qua-tlshttps-v%E1%BB%9Bi-nginx-reverse-proxy">2. Mã hóa Đường truyền Toàn diện qua TLS/HTTPS với Nginx Reverse Proxy</a></li>
+<li><a href="#3-x%C3%A1c-th%E1%BB%B1c-truy-c%E1%BA%ADp-web-basic-auth-bcrypt-cho-prometheus-v%C3%A0-exporter">3. Xác thực Truy cập Web Basic Auth (bcrypt) cho Prometheus và Exporter</a></li>
+<li><a href="#4-ki%E1%BB%83m-so%C3%A1t-ph%C3%A2n-quy%E1%BB%81n-rbac-v%C3%A0-si%E1%BA%BFt-ch%E1%BA%B7t-b%E1%BA%A3o-m%E1%BA%ADt-grafana">4. Kiểm soát Phân quyền (RBAC) và Siết chặt Bảo mật Grafana</a></li>
+<li><a href="#5-t%C6%B0%E1%BB%9Dng-l%E1%BB%ADa-h%E1%BA%A1-t%E1%BA%A7ng-ufw-v%C3%A0-v%C3%B4-hi%E1%BB%87u-h%C3%B3a-endpoint-qu%E1%BA%A3n-tr%E1%BB%8B-nh%E1%BA%A1y-c%E1%BA%A3m">5. Tường lửa Hạ tầng UFW và Vô hiệu hóa Endpoint Quản trị Nhạy cảm</a></li>
+<li><a href="#6-k%E1%BB%8Bch-b%E1%BA%A3n-ki%E1%BB%83m-th%E1%BB%AD-b%E1%BA%A3o-m%E1%BA%ADt-v%C3%A0-b%E1%BA%A3ng-checklist-hardening">6. Kịch bản Kiểm thử Bảo mật và Bảng Checklist Hardening</a></li>
+</ul>
+</li>
+<li><a href="#vi-optimization">VI. Optimization</a>
+<ul>
+<li><a href="#1-qu%E1%BA%A3n-l%C3%BD-metric-cardinality-v%C3%A0-k%E1%BB%B9-thu%E1%BA%ADt-relabeling">1. Quản lý Metric Cardinality và Kỹ thuật Relabeling</a></li>
+<li><a href="#2-t%E1%BB%91i-%C6%B0u-h%C3%B3a-truy-v%E1%BA%A5n-v%E1%BB%9Bi-recording-rules-trong-prometheus">2. Tối ưu hóa Truy vấn với Recording Rules trong Prometheus</a></li>
+<li><a href="#3-application-performance-monitoring-apm--golden-signals">3. Application Performance Monitoring (APM) &amp; Golden Signals</a></li>
+<li><a href="#4-tinh-ch%E1%BB%89nh-b%E1%BB%99-m%C3%A1y-l%C6%B0u-tr%E1%BB%AF-n%E1%BB%99i-t%E1%BA%A1i-tsdb-engine-tuning">4. Tinh chỉnh Bộ máy Lưu trữ Nội tại (TSDB Engine Tuning)</a></li>
+</ul>
+</li>
+<li><a href="#vii-gitops-monitoring-as-code">VII. GitOps, Monitoring as Code</a>
+<ul>
+<li><a href="#1-%C4%91%E1%BA%B7t-v%E1%BA%A5n-%C4%91%E1%BB%81-th%E1%BA%A3m-h%E1%BB%8Da-clickops-v%C3%A0-tri%E1%BA%BFt-l%C3%BD-monitoring-as-code">1. Đặt vấn đề: Thảm họa ClickOps và Triết lý Monitoring-as-Code</a></li>
+<li><a href="#2-khai-b%C3%A1o-ngu%E1%BB%93n-d%E1%BB%AF-li%E1%BB%87u-v%C3%A0-dashboard-t%E1%BB%B1-%C4%91%E1%BB%99ng-grafana-provisioning">2. Khai báo Nguồn dữ liệu và Dashboard Tự động (Grafana Provisioning)</a></li>
+<li><a href="#3-c%E1%BA%A5p-ph%C3%A1t-m%E1%BB%A5c-ti%C3%AAu-gi%C3%A1m-s%C3%A1t-%C4%91%E1%BB%99ng-qua-file-based-service-discovery">3. Cấp phát Mục tiêu Giám sát Động qua File-based Service Discovery</a></li>
+<li><a href="#4-x%C3%A2y-d%E1%BB%B1ng-pipeline-tri%E1%BB%83n-khai-t%E1%BB%B1-%C4%91%E1%BB%99ng-an-to%C3%A0n-deploy_stacksh">4. Xây dựng Pipeline Triển khai Tự động An toàn (<code>deploy_stack.sh</code>)</a></li>
+<li><a href="#5-b%E1%BA%A3ng-so-s%C3%A1nh-to%C3%A0n-di%E1%BB%87n-ph%C6%B0%C6%A1ng-th%E1%BB%A9c-v%E1%BA%ADn-h%C3%A0nh-clickops-vs-gitops">5. Bảng So sánh Toàn diện Phương thức Vận hành ClickOps vs. GitOps</a></li>
+</ul>
+</li>
+</ul>
+<hr />
+<h1>I. Overview: Brief Introduction of Monitoring and Logging, the Need of That and Why We Chose This Topic</h1>
+<h2>1. Khái niệm và Bối cảnh Observability (Khả năng quan sát)</h2>
+<p>Trong kỷ nguyên điện toán đám mây và kiến trúc phân tán (Microservices, Kubernetes, Multi-cloud), các hệ thống phần mềm và hạ tầng máy chủ ngày càng trở nên phức tạp. Khi một sự cố xảy ra (ví dụ: phản hồi người dùng chậm, máy chủ cạn kiệt tài nguyên, dịch vụ sập đột ngột), phương thức dò tìm lỗi truyền thống thông qua việc đăng nhập SSH vào từng máy chủ để đọc log thủ công hoàn toàn bất khả thi.</p>
+<p>Để kiểm soát và hiểu rõ trạng thái nội tại của hệ thống từ bên ngoài, khái niệm <strong>Observability (Khả năng quan sát)</strong> được hình thành dựa trên 3 trụ cột (The Three Pillars of Observability):</p>
+<ol>
+<li><strong>Metrics (Số liệu đo lường theo chuỗi thời gian):</strong> Các giá trị số thể hiện hành vi tài nguyên và ứng dụng theo thời gian (ví dụ: % sử dụng CPU, dung lượng RAM khả dụng, số lượng request/giây, độ trễ 99th percentile). Metrics có đặc điểm là nhỏ gọn, cấu trúc chuẩn hóa, chi phí lưu trữ thấp và cực kỳ tối ưu cho việc vẽ biểu đồ xu hướng (Dashboards) và kích hoạt cảnh báo tự động (Alerting).</li>
+<li><strong>Logs (Nhật ký sự kiện):</strong> Các bản ghi văn bản (text hoặc JSON) chứa thông điệp chi tiết về một sự kiện cụ thể đã xảy ra tại một thời điểm nhất định (ví dụ: traceback ngoại lệ trong mã nguồn, nhật ký truy cập HTTP 404/500, nhật ký kernel OOM-killer). Logs giúp kỹ sư trả lời câu hỏi <em>&quot;Chuyện gì chính xác đã xảy ra tại thời điểm đó?&quot;</em>.</li>
+<li><strong>Traces (Dấu vết phân tán):</strong> Theo dõi đường đi của một yêu cầu (request lifecycle) xuyên suốt qua hàng chục dịch vụ vi mô khác nhau để định vị điểm nghẽn độ trễ.</li>
+</ol>
+<h3>So sánh cốt lõi: Monitoring vs. Logging</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tiêu chí</th>
+<th style="text-align:left">Metrics (Monitoring)</th>
+<th style="text-align:left">Logs (Logging)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Bản chất dữ liệu</strong></td>
+<td style="text-align:left">Dữ liệu số (Numeric Float64), gắn kèm nhãn (Labels) và nhãn thời gian (Timestamp).</td>
+<td style="text-align:left">Dòng chữ (Strings), có cấu trúc (JSON) hoặc phi cấu trúc (Plain text).</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Mục đích chính</strong></td>
+<td style="text-align:left">Phát hiện bất thường tức thì, kích hoạt chuông cảnh báo, nhận diện xu hướng tài nguyên.</td>
+<td style="text-align:left">Điều tra chuyên sâu nguyên nhân gốc rễ (Root Cause Analysis - RCA) sau khi đã biết sự cố xảy ra.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Băng thông &amp; Dung lượng</strong></td>
+<td style="text-align:left">Cực kỳ tiết kiệm (~1 đến 2 bytes cho mỗi điểm đo nhờ các thuật toán nén TSDB).</td>
+<td style="text-align:left">Tiêu tốn dung lượng đĩa và băng thông mạng rất lớn (vài chục MB tới hàng GB log mỗi ngày).</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tốc độ truy vấn</strong></td>
+<td style="text-align:left">Siêu nhanh, tổng hợp hàng triệu mẫu trong vài mili-giây qua PromQL.</td>
+<td style="text-align:left">Chậm hơn, yêu cầu đánh chỉ mục toàn văn (Full-text index) như Elasticsearch, OpenSearch, Loki.</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart TD
+    subgraph S1 ["Tầng Nguồn Dữ liệu (Infrastructure)"]
+        Target["Máy chủ Linux & Ứng dụng (mon-target)<br/>Phát sinh đồng thời dữ liệu số (Metrics) và nhật ký sự kiện (Logs)"]
+    end
+
+    subgraph S2 ["Tầng Thu thập & Lưu trữ Tập trung (Observability Engine)"]
+        direction LR
+        subgraph Stream_Metrics ["Trụ cột Metrics (Định lượng: 'Cái gì đang hỏng?')"]
+            Prom["Prometheus Server<br/>Cào số liệu định kỳ & TSDB Storage"]
+            Alert["Alertmanager<br/>Định tuyến & Bắn cảnh báo tức thì"]
+            Prom -->|"Phát hiện vượt ngưỡng"| Alert
+        end
+
+        subgraph Stream_Logs ["Trụ cột Logs (Định tính: 'Tại sao lại hỏng?')"]
+            Loki["Log Aggregator (Loki/Promtail)<br/>Thu gom dòng log & Phân tích chuyên sâu"]
+        end
+
+        Stream_Metrics ~~~ Stream_Logs
+    end
+
+    subgraph S3 ["Tầng Vận hành & Khắc phục Sự cố (Unified Operations Cockpit)"]
+        Grafana["Grafana Operations Dashboard<br/>Trực quan hóa đồ thị Metrics kết hợp tra cứu dòng Log trên cùng một màn hình"]
+        Engineer["Kỹ sư Vận hành (SRE/DevOps)<br/>Nhận cảnh báo khẩn và định vị nguyên nhân gốc trong vài phút"]
+        Grafana --- Engineer
+    end
+
+    Target ==>|"Scrape Metrics mỗi 5s"| Prom
+    Target ==>|"Đẩy Logs sự kiện"| Loki
+    Prom -.->|"Truy vấn số liệu PromQL"| Grafana
+    Loki -.->|"Truy vết nhật ký LogQL"| Grafana
+    Alert ==>|"Bắn tin Telegram khẩn"| Engineer
+</pre></div></code></pre>
+<hr />
+<h2>2. Sự cần thiết của Giám sát và Ghi log trong Vận hành Hiện đại</h2>
+<p>Việc triển khai một hệ thống Giám sát &amp; Ghi log tự động mang lại những giá trị sống còn cho doanh nghiệp và đội ngũ kỹ thuật:</p>
+<ol>
+<li><strong>Chuyển dịch từ thế Bị động (Reactive) sang Chủ động (Proactive):</strong>
+Thay vì chờ đợi người dùng phản ánh dịch vụ bị treo hoặc trang web không truy cập được, hệ thống cảnh báo tự động kích hoạt thông báo ngay khi tải CPU vượt ngưỡng 85% trong 3 phút hoặc ổ cứng chỉ còn dưới 15% dung lượng trống, giúp kỹ sư xử lý trước khi thảm họa xảy ra.</li>
+<li><strong>Đảm bảo SLA/SLO và Giảm thiểu MTTR/MTTD:</strong>
+<ul>
+<li><strong>MTTD (Mean Time To Detect):</strong> Rút ngắn thời gian phát hiện sự cố từ hàng giờ xuống vài giây.</li>
+<li><strong>MTTR (Mean Time To Recovery):</strong> Cung cấp biểu đồ trực quan giúp kỹ sư lập tức khoanh vùng được thành phần lỗi (mạng, CPU, bộ nhớ, tiến trình dịch vụ).</li>
+</ul>
+</li>
+<li><strong>Hoạch định Năng lực Hạ tầng (Capacity Planning):</strong>
+Dựa trên dữ liệu chuỗi thời gian được tích lũy nhiều tuần/tháng, nhà quản trị có thể dự báo chính xác thời điểm máy chủ sẽ quá tải để nâng cấp tài nguyên kịp thời, tránh lãng phí chi phí thuê phần cứng dư thừa.</li>
+<li><strong>Phân tích Nguyên nhân Gốc rễ (Root-Cause Analysis - RCA):</strong>
+Khi một sự cố sập hệ thống xảy ra, dữ liệu metric trước thời điểm sập là bằng chứng pháp y số (forensics) duy nhất còn sót lại để chỉ ra tiến trình nào đã rò rỉ bộ nhớ hoặc gây tắc nghẽn I/O đĩa.</li>
+</ol>
+<hr />
+<h2>3. Lý do lựa chọn Đề tài (Why We Chose This Topic)</h2>
+<p>Đề tài <strong>&quot;Xây dựng Hệ thống Giám sát và Cảnh báo Tự động với Prometheus, Grafana, Alertmanager và Node Exporter&quot;</strong> được lựa chọn vì những lý do thực tiễn sau:</p>
+<ol>
+<li><strong>Chuẩn công nghiệp Thực tế (Industry Standard):</strong>
+Prometheus là dự án mã nguồn mở tốt nghiệp thứ hai của tổ chức Cloud Native Computing Foundation (CNCF - chỉ sau Kubernetes). Kết hợp cùng Grafana, đây là bộ công cụ giám sát phổ biến nhất thế giới trong môi trường Linux Server, DevOps và Cloud Platform.</li>
+<li><strong>Kiến trúc Pull Model Tinh gọn và Độc lập:</strong>
+Khác với các hệ thống truyền thống đòi hỏi máy chủ mục tiêu phải liên tục gửi dữ liệu về trung tâm (Push model), Prometheus áp dụng cơ chế <strong>Pull model</strong>. Máy chủ giám sát tự kiểm soát tần suất cào dữ liệu, loại bỏ nguy cơ máy chủ giám sát bị nghẽn (DDoS) khi hàng trăm agent gửi tin dồn dập.</li>
+<li><strong>Môi trường Thực nghiệm Giàu Thách thức Kỹ thuật:</strong>
+Đề tài không dừng lại ở việc cài đặt cơ bản (ClickOps) mà giải quyết trực diện các bài toán khắt khe trong môi trường sản xuất thực tế (Production Readiness):
+<ul>
+<li>Xử lý xung đột cổng và triệt tiêu bão cảnh báo (Alert Fatigue).</li>
+<li>Đảm bảo tính sẵn sàng cao (High Availability) và lưu trữ dài hạn (Long-term Storage) khi TSDB Prometheus bị giới hạn dung lượng cục bộ.</li>
+<li>Tối ưu hóa hiệu năng tính toán với Recording Rules và Relabeling để kiểm soát Metric Cardinality.</li>
+<li>Thiết lập phòng thủ an ninh mạng: Mã hóa TLS, xác thực Basic Auth mã hóa bcrypt, tường lửa UFW và phân quyền RBAC.</li>
+<li>Hiện đại hóa vận hành với triết lý GitOps &amp; Monitoring-as-Code.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>4. Nền tảng Lý thuyết Cốt lõi về Prometheus &amp; Time Series Data</h2>
+<h3>4.1. Mô hình Kéo (Pull) so với Mô hình Đẩy (Push)</h3>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart LR
+    subgraph Pull_Model ["Mô hình Kéo (Pull) - Chuẩn Prometheus"]
+        direction TB
+        P_Server["Prometheus Server<br/>(Chủ động kết nối cào dữ liệu)"]
+        P_Target["Target: Node Exporter :9100<br/>(Chỉ phơi endpoint /metrics)"]
+        P_Server -->|"1. HTTP GET /metrics định kỳ"| P_Target
+        P_Server -.->|"2. Timeout / Không phản hồi: up=0"| P_Target
+    end
+
+    subgraph Push_Model ["Mô hình Đẩy (Push) - Truyền thống"]
+        direction TB
+        Agent["Push Agent trên Máy trạm<br/>(Chủ động đẩy dữ liệu ra ngoài)"]
+        Central["Central Server (Graphite / InfluxDB)<br/>(Bị động tiếp nhận dữ liệu)"]
+        Agent -->|"Gửi dữ liệu dồn dập liên tục"| Central
+        Central -.->|"Rủi ro quá tải khi quy mô mở rộng"| Central
+    end
+</pre></div></code></pre>
+<ul>
+<li><strong>Mô hình Pull (Prometheus):</strong> Prometheus chủ động gửi yêu cầu HTTP GET đến endpoint <code>/metrics</code> của từng target theo chu kỳ định trước (<code>scrape_interval</code>). Target chỉ đóng vai trò &quot;phơi&quot; dữ liệu dạng văn bản thuần.</li>
+<li><strong>Mô hình Push:</strong> Từng agent trên máy client chủ động đóng gói dữ liệu và đẩy về server trung tâm.</li>
+</ul>
+<h4>Bảng so sánh 7 tiêu chí then chốt:</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tiêu chí</th>
+<th style="text-align:left">Mô hình Pull (Prometheus)</th>
+<th style="text-align:left">Mô hình Push truyền thống</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Kiểm soát tần suất</strong></td>
+<td style="text-align:left">Server tập trung quyết định chu kỳ cào, tránh nghẽn.</td>
+<td style="text-align:left">Từng agent quyết định; rủi ro server bị quá tải khi quy mô lớn.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Phát hiện máy chủ sập</strong></td>
+<td style="text-align:left"><strong>Cực kỳ trực quan:</strong> Scrape thất bại → Prometheus tự động gán nhãn <code>up = 0</code>.</td>
+<td style="text-align:left"><strong>Khó khăn:</strong> Không nhận được dữ liệu có thể do agent chết, hoặc do agent chưa có gì để gửi.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Gỡ lỗi (Debugging)</strong></td>
+<td style="text-align:left">Dễ dàng kiểm tra bằng <code>curl http://target:9100/metrics</code>.</td>
+<td style="text-align:left">Phải soi log cục bộ của từng agent trên từng máy chủ.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Cấu hình trên Agent</strong></td>
+<td style="text-align:left">Đơn giản: Agent không cần biết địa chỉ IP của server giám sát.</td>
+<td style="text-align:left">Phức tạp: Mỗi agent phải cấu hình địa chỉ IP/domain của trung tâm.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Vấn đề NAT / Firewall</strong></td>
+<td style="text-align:left">Cần giải pháp Ingress / Proxy nếu target nằm sâu trong mạng kín.</td>
+<td style="text-align:left">Dễ đi qua firewall vì agent chủ động mở kết nối ra ngoài.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Batch Jobs ngắn hạn</strong></td>
+<td style="text-align:left">Khó cào nếu job chạy và kết thúc trong vài giây (giải quyết bằng <strong>Pushgateway</strong>).</td>
+<td style="text-align:left">Rất phù hợp với batch job.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Độ tin cậy tín hiệu</strong></td>
+<td style="text-align:left">Tín hiệu <code>up</code> là chỉ báo sức khỏe sống còn của dịch vụ.</td>
+<td style="text-align:left">Phụ thuộc vào cơ chế Heartbeat riêng biệt.</td>
+</tr>
+</tbody>
+</table>
+<h3>4.2. Bốn Loại Metric Chuẩn trong Prometheus</h3>
+<p>Mọi metric được thu thập đều tuân thủ cấu trúc chuẩn OpenMetrics/Prometheus:</p>
+<pre><code class="language-text"><div class="highlight cmd-box"><div class="lang-badge">text</div><pre><code class="language-text"># HELP node_cpu_seconds_total Seconds the CPUs spent in each mode.
+# TYPE node_cpu_seconds_total counter
+node_cpu_seconds_total{cpu="0",mode="idle"} 18452.73
+</code></pre></div></code></pre>
+<p>Bao gồm: <strong>Tên metric</strong> (<code>node_cpu_seconds_total</code>), <strong>Nhãn key-value</strong> (<code>cpu=&quot;0&quot;,mode=&quot;idle&quot;</code>), và <strong>Giá trị Float64</strong> (<code>18452.73</code>).</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Loại Metric</th>
+<th style="text-align:left">Bản chất hoạt động</th>
+<th style="text-align:left">Ứng dụng thực tế</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Counter</strong></td>
+<td style="text-align:left">Giá trị số nguyên hoặc thực <strong>chỉ tăng dần</strong>, chỉ được reset về <code>0</code> khi tiến trình hoặc máy chủ khởi động lại.</td>
+<td style="text-align:left"><code>node_cpu_seconds_total</code>, <code>node_network_receive_bytes_total</code>, tổng số HTTP request.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Gauge</strong></td>
+<td style="text-align:left">Giá trị tức thời, <strong>có thể tăng hoặc giảm tự do</strong> theo biến thiên thực tế của hệ thống.</td>
+<td style="text-align:left"><code>node_memory_MemAvailable_bytes</code>, % nhiệt độ CPU, số luồng tiến trình đang chạy.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Histogram</strong></td>
+<td style="text-align:left">Đếm số lượng quan sát rơi vào từng khoảng kích thước định trước (bucket <code>le</code>), tự sinh ra 3 metric: <code>&lt;metric&gt;_bucket</code>, <code>&lt;metric&gt;_sum</code>, <code>&lt;metric&gt;_count</code>.</td>
+<td style="text-align:left">Đo độ trễ yêu cầu HTTP (Response latency) phục vụ tính toán 95th/99th percentile qua <code>histogram_quantile()</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Summary</strong></td>
+<td style="text-align:left">Tính toán sẵn các mức phân vị (quantiles: 0.5, 0.9, 0.99) ngay tại phía client exporter.</td>
+<td style="text-align:left">Đo kích thước gói tin hoặc thời gian xử lý khi không cần gộp (aggregate) giữa nhiều máy chủ.</td>
+</tr>
+</tbody>
+</table>
+<h4>Vì sao Counter luôn phải đi kèm với hàm <code>rate()</code>?</h4>
+<p>Một hiểu lầm phổ biến của người mới học là truy vấn trực tiếp giá trị Counter:</p>
+<pre><code class="language-promql"><div class="highlight cmd-box"><div class="lang-badge">promql</div><pre><code class="language-promql"><span class="c1"># SAI LẦM: Trả về một con số khổng lồ (ví dụ: 18452 giây) - tổng thời gian CPU rảnh kể từ khi bật máy!</span>
+<span class="nv">node_cpu_seconds_total</span><span class="p">{</span><span class="nl">mode</span><span class="o">=</span><span class="p">"</span><span class="s">idle</span><span class="p">"}</span>
+</code></pre></div></code></pre>
+<p>Con số này không phản ánh CPU hiện tại đang bận hay rảnh. Để tính toán tốc độ tiêu thụ tài nguyên thực tế, ta bắt buộc phải sử dụng hàm <code>rate()</code>:
+$$\text{rate}(V[t]) = \frac{\Delta V}{\Delta t}$$
+Hàm <code>rate(node_cpu_seconds_total{mode=&quot;idle&quot;}[1m])</code> tính toán tốc độ tăng trung bình mỗi giây của giá trị Counter trong cửa sổ thời gian 1 phút, đồng thời <strong>tự động xử lý sự kiện reset Counter về 0</strong> khi máy chủ hoặc tiến trình bị khởi động lại.</p>
+<h3>4.3. Kiến trúc Bộ máy Lưu trữ Chuỗi Thời gian (TSDB Engine)</h3>
+<p>Prometheus không dùng các cơ sở dữ liệu quan hệ như PostgreSQL hay NoSQL chung như MongoDB, mà tự xây dựng bộ máy lưu trữ chuỗi thời gian tối ưu hóa riêng biệt (TSDB):</p>
+<ul>
+<li><strong>In-Memory Head Block:</strong> Dữ liệu mới thu thập được lưu trực tiếp trên RAM trong Head block để truy vấn nhanh nhất.</li>
+<li><strong>Write-Ahead Log (WAL):</strong> Trước khi cập nhật vào Head block trên RAM, mỗi mẫu dữ liệu được ghi tuần tự vào đĩa cứng (WAL) nhằm đảm bảo an toàn dữ liệu, chống mất mát khi mất điện đột ngột.</li>
+<li><strong>Chu kỳ Compaction 2 Giờ (2-Hour Blocks):</strong> Cứ mỗi 2 giờ, dữ liệu trong Head block được đóng băng, nén lại bằng thuật toán Gorilla/XOR timestamp compression và ghi xuống đĩa thành một thư mục Block hoàn chỉnh chứa các tệp: <code>meta.json</code>, <code>chunks/</code>, <code>index</code>, <code>tombstones</code>.</li>
+<li><strong>Dung lượng nén vượt trội:</strong> TSDB của Prometheus chỉ tốn khoảng <strong>1.37 bytes</strong> cho mỗi mẫu điểm đo (sample), cho phép một máy chủ thông thường lưu trữ hàng trăm triệu bản ghi với dung lượng đĩa cực kỳ khiêm tốn.</li>
+</ul>
+<hr />
+<h1>II. Set Up the Environment</h1>
+<h2>1. Kiến trúc Mô hình Thực nghiệm Phân tán</h2>
+<p>Toàn bộ hệ thống thực nghiệm trong đề tài được thiết kế theo mô hình phân tán 2 máy ảo độc lập, tái hiện sát với kiến trúc hạ tầng thực tế của doanh nghiệp:</p>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart TD
+    subgraph KVM_Env ["Hạ tầng Ảo hóa KVM/libvirt (Mạng NAT: 192.168.122.0/24 virbr0)"]
+        direction LR
+        subgraph VM_Server ["VM 1: mon-server (192.168.122.100) — Trung tâm Giám sát"]
+            direction TB
+            Grafana["Grafana Dashboard (:3000)<br/>Trực quan hóa đồ thị & bảng điều khiển"]
+            Prometheus["Prometheus Server (:9090)<br/>TSDB Engine & Đánh giá Rule"]
+            Alertmanager["Alertmanager (:9093)<br/>Gom cụm, triệt tiêu & định tuyến cảnh báo"]
+
+            Grafana -->|"Truy vấn PromQL"| Prometheus
+            Prometheus -->|"Bắn Alert vượt ngưỡng"| Alertmanager
+        end
+
+        subgraph VM_Target ["VM 2: mon-target (192.168.122.38) — Máy chủ Mục tiêu"]
+            direction TB
+            NodeExporter["Node Exporter (:9100)<br/>Thu thập CPU, RAM, Disk, Mạng"]
+            StressTool["Bộ Sinh Tải Thực nghiệm<br/>stress-ng & auto_stress.py"]
+            StressTool -.->|"Gây áp lực tài nguyên"| NodeExporter
+        end
+
+        VM_Server ~~~ VM_Target
+        Prometheus ==>|"Scrape metrics định kỳ mỗi 5 giây"| NodeExporter
+    end
+
+    TelegramBot["Telegram Bot Channel (Kỹ sư Vận hành SRE)"]
+    Alertmanager ==>|"Gửi cảnh báo sự cố khẩn cấp (HTML)"| TelegramBot
+</pre></div></code></pre>
+<h3>Thông số kỹ thuật của các nút:</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tên Máy ảo</th>
+<th style="text-align:left">Địa chỉ IP (Ví dụ)</th>
+<th style="text-align:left">Cấu hình Phần cứng</th>
+<th style="text-align:left">Vai trò và Dịch vụ triển khai</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong><code>mon-server</code></strong></td>
+<td style="text-align:left"><code>192.168.122.100</code></td>
+<td style="text-align:left">1 vCPU, 1.5GB RAM, 10GB CoW Disk</td>
+<td style="text-align:left"><strong>Trung tâm Giám sát:</strong> Prometheus v2.42+, Alertmanager v0.25+, Grafana v10+</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong><code>mon-target</code></strong></td>
+<td style="text-align:left"><code>192.168.122.38</code></td>
+<td style="text-align:left">1 vCPU, 512MB RAM, 5GB CoW Disk</td>
+<td style="text-align:left"><strong>Máy chủ Mục tiêu:</strong> Node Exporter, <code>stress-ng</code>, Python 3 <code>psutil</code> load generator</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>2. Thiết lập Môi trường Host (KVM/libvirt trên Arch Linux, Fedora, VirtualBox)</h2>
+<h3>2.1. Cài đặt trên Arch Linux Host (Nền tảng chính của đề tài)</h3>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># 1. Cài đặt các gói ảo hóa phần cứng và mạng</span>
+sudo<span class="w"> </span>pacman<span class="w"> </span>-S<span class="w"> </span>--needed<span class="w"> </span>qemu-desktop<span class="w"> </span>libvirt<span class="w"> </span>virt-manager<span class="w"> </span>iptables-nft<span class="w"> </span>dnsmasq
+
+<span class="c1"># 2. Cấp quyền điều khiển KVM cho người dùng hiện tại</span>
+sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>libvirt,kvm<span class="w"> </span><span class="nv">$USER</span>
+
+<span class="c1"># 3. Kích hoạt và khởi chạy daemon libvirt</span>
+sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>libvirtd.service
+
+<span class="c1"># 4. Kích hoạt mạng ảo default (NAT 192.168.122.0/24)</span>
+sudo<span class="w"> </span>virsh<span class="w"> </span>net-autostart<span class="w"> </span>default
+sudo<span class="w"> </span>virsh<span class="w"> </span>net-start<span class="w"> </span>default
+
+<span class="c1"># 5. Kiểm tra trạng thái mạng ảo</span>
+sudo<span class="w"> </span>virsh<span class="w"> </span>net-list<span class="w"> </span>--all
+</code></pre></div></code></pre>
+<h3>2.2. Hỗ trợ cho các Host khác (Fedora &amp; VirtualBox)</h3>
+<ul>
+<li><strong>Trên Fedora:</strong> <code>sudo dnf install -y @virtualization &amp;&amp; sudo systemctl enable --now libvirtd</code></li>
+<li><strong>Trên VirtualBox:</strong> Thiết lập 2 Card mạng (Adapter 1: NAT để ra Internet, Adapter 2: Host-Only Network dải <code>192.168.56.0/24</code> để các VM thông nhau).</li>
+</ul>
+<hr />
+<h2>3. Cấp phát Máy ảo Tự động bằng Cloud-Init và CoW Overlay Disk</h2>
+<p>Nhằm tối ưu hóa tốc độ triển khai và tiết kiệm dung lượng đĩa của máy Host, phương pháp <strong>Copy-on-Write (CoW)</strong> dựa trên tệp ảnh đĩa gốc Debian 12 Cloud Image được áp dụng triệt để.</p>
+<h3>Bước 1: Chuẩn bị Base Image và Tạo CoW Overlays</h3>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Tạo thư mục làm việc lưu trữ máy ảo</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>~/vms<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/vms
+
+<span class="c1"># Tải bản Debian 12 Minimal Cloud Image chuẩn</span>
+wget<span class="w"> </span>https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2<span class="w"> </span>-O<span class="w"> </span>debian-12-base.qcow2
+
+<span class="c1"># Tạo 2 đĩa Copy-on-Write liên kết với Base Image</span>
+qemu-img<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>qcow2<span class="w"> </span>-b<span class="w"> </span>debian-12-base.qcow2<span class="w"> </span>-F<span class="w"> </span>qcow2<span class="w"> </span>mon-server.qcow2<span class="w"> </span>10G
+qemu-img<span class="w"> </span>create<span class="w"> </span>-f<span class="w"> </span>qcow2<span class="w"> </span>-b<span class="w"> </span>debian-12-base.qcow2<span class="w"> </span>-F<span class="w"> </span>qcow2<span class="w"> </span>mon-target.qcow2<span class="w"> </span>5G
+</code></pre></div></code></pre>
+<h3>Bước 2: Khởi tạo cấu hình Cloud-Init (<code>user-data</code>)</h3>
+<p>Tạo file <code>user-data</code> để tự động gán tài khoản, mật khẩu và cho phép xác thực SSH:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="c1">#cloud-config</span>
+<span class="nt">user</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debian</span>
+<span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">password123</span>
+<span class="nt">chpasswd</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> expire</span><span class="p">:</span><span class="w"> </span><span class="nv">False</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="nt">ssh_pwauth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">True</span>
+<span class="nt">package_update</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">packages</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wget</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sudo</span>
+</code></pre></div></code></pre>
+<p>Tạo file <code>meta-data</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">instance-id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debian-lab10</span>
+<span class="nt">local-hostname</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debian-lab10</span>
+</code></pre></div></code></pre>
+<p>Đóng gói thành tệp ISO cấu hình đám mây:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">genisoimage<span class="w"> </span>-output<span class="w"> </span>cidata.iso<span class="w"> </span>-volid<span class="w"> </span>cidata<span class="w"> </span>-joliet<span class="w"> </span>-rock<span class="w"> </span>user-data<span class="w"> </span>meta-data
+</code></pre></div></code></pre>
+<h3>Bước 3: Triển khai 2 Máy ảo bằng <code>virt-install</code></h3>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Khởi chạy mon-server (1.5GB RAM)</span>
+virt-install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>mon-server<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--memory<span class="w"> </span><span class="m">1536</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--vcpus<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disk<span class="w"> </span><span class="nv">path</span><span class="o">=</span>~/vms/mon-server.qcow2,format<span class="o">=</span>qcow2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disk<span class="w"> </span><span class="nv">path</span><span class="o">=</span>~/vms/cidata.iso,device<span class="o">=</span>cdrom<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--os-variant<span class="w"> </span>debian11<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--network<span class="w"> </span><span class="nv">network</span><span class="o">=</span>default<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--graphics<span class="w"> </span>none<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--noautoconsole<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--import
+
+<span class="c1"># Khởi chạy mon-target (512MB RAM)</span>
+virt-install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--name<span class="w"> </span>mon-target<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--memory<span class="w"> </span><span class="m">512</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--vcpus<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disk<span class="w"> </span><span class="nv">path</span><span class="o">=</span>~/vms/mon-target.qcow2,format<span class="o">=</span>qcow2<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disk<span class="w"> </span><span class="nv">path</span><span class="o">=</span>~/vms/cidata.iso,device<span class="o">=</span>cdrom<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--os-variant<span class="w"> </span>debian11<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--network<span class="w"> </span><span class="nv">network</span><span class="o">=</span>default<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--graphics<span class="w"> </span>none<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--noautoconsole<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--import
+</code></pre></div></code></pre>
+<p>Kiểm tra địa chỉ IP được cấp phát qua DHCP lease:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">virsh<span class="w"> </span>net-dhcp-leases<span class="w"> </span>default
+</code></pre></div></code></pre>
+<hr />
+<h2>4. Cấu hình Máy ảo Mục tiêu (Target VM - <code>mon-target</code>)</h2>
+<p>Đăng nhập vào <code>mon-target</code> qua SSH (<code>ssh debian@192.168.122.38</code>) và tiến hành cài đặt:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># 1. Cài đặt Node Exporter và các công cụ phục vụ kiểm thử</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>update
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>prometheus-node-exporter<span class="w"> </span>stress-ng<span class="w"> </span>python3<span class="w"> </span>python3-psutil
+
+<span class="c1"># 2. Khởi chạy và kích hoạt dịch vụ Node Exporter</span>
+sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>prometheus-node-exporter
+
+<span class="c1"># 3. Kiểm tra cổng lắng nghe 9100 và endpoint dữ liệu</span>
+curl<span class="w"> </span>-s<span class="w"> </span>http://localhost:9100/metrics<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span><span class="m">20</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>5. Cài đặt và Cấu hình Máy chủ Giám sát (Monitoring Server - <code>mon-server</code>)</h2>
+<p>Đăng nhập vào <code>mon-server</code> qua SSH (<code>ssh debian@192.168.122.100</code>):</p>
+<h3>Bước 1: Cài đặt Prometheus, Alertmanager và Grafana</h3>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Cài đặt Prometheus và Alertmanager từ repository chính thức của Debian</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>update
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>prometheus<span class="w"> </span>prometheus-alertmanager
+
+<span class="c1"># Thêm kho phần mềm chính thức của Grafana Labs</span>
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>apt-transport-https<span class="w"> </span>software-properties-common<span class="w"> </span>wget
+sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/apt/keyrings/
+wget<span class="w"> </span>-q<span class="w"> </span>-O<span class="w"> </span>-<span class="w"> </span>https://apt.grafana.com/gpg.key<span class="w"> </span><span class="p">|</span><span class="w"> </span>gpg<span class="w"> </span>--dearmor<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>tee<span class="w"> </span>/etc/apt/keyrings/grafana.gpg<span class="w"> </span>&gt;<span class="w"> </span>/dev/null
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>tee<span class="w"> </span>-a<span class="w"> </span>/etc/apt/sources.list.d/grafana.list
+
+sudo<span class="w"> </span>apt<span class="w"> </span>update
+sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>grafana
+</code></pre></div></code></pre>
+<h3>Bước 2: Cấu hình Prometheus Scrape Target</h3>
+<p>Biên tập tệp cấu hình trung tâm <code>/etc/prometheus/prometheus.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">global</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w">  </span><span class="nt">evaluation_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+
+<span class="nt">alerting</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">alertmanagers</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span>
+<span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'127.0.0.1:9093'</span>
+
+<span class="nt">rule_files</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'/etc/prometheus/alert_rules.yml'</span>
+
+<span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">'prometheus'</span>
+<span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'localhost:9090'</span><span class="p p-Indicator">]</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">'node_exporter'</span>
+<span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'192.168.122.38:9100'</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">instance</span><span class="p">:</span><span class="w"> </span><span class="s">'mon-target'</span>
+<span class="w">          </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="s">'production'</span>
+</code></pre></div></code></pre>
+<p>Kiểm tra tính hợp lệ của cấu hình và khởi động lại dịch vụ:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">promtool<span class="w"> </span>check<span class="w"> </span>config<span class="w"> </span>/etc/prometheus/prometheus.yml
+sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>prometheus<span class="w"> </span>prometheus-alertmanager<span class="w"> </span>grafana-server
+sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>prometheus<span class="w"> </span>prometheus-alertmanager<span class="w"> </span>grafana-server
+</code></pre></div></code></pre>
+<hr />
+<h2>6. Kết nối Data Source và Trực quan hóa trên Grafana</h2>
+<ol>
+<li>Truy cập giao diện Web của Grafana tại địa chỉ: <code>http://192.168.122.100:3000</code> (Tài khoản mặc định: <code>admin</code> / <code>admin</code>).</li>
+<li>Vào <strong>Connections</strong> → <strong>Data Sources</strong> → Chọn <strong>Prometheus</strong>.</li>
+<li>Điền URL: <code>http://127.0.0.1:9090</code> → Nhấn <strong>Save &amp; Test</strong> (Hiển thị thông báo <em>&quot;Data source is working&quot;</em> màu xanh).</li>
+<li>Vào mục <strong>Dashboards</strong> → <strong>New</strong> → <strong>Import</strong> → Nhập ID Dashboard cộng đồng <code>1860</code> (<strong>Node Exporter Full</strong>) → Chọn Data Source là <code>Prometheus</code> vừa tạo → Nhấn <strong>Import</strong>.</li>
+<li>Toàn bộ thông số sống còn của <code>mon-target</code> (CPU, Memory, Disk I/O, Network Traffic) lập tức được hiển thị trực quan và cập nhật mỗi 5 giây.</li>
+</ol>
+<hr />
+<h1>III. HA &amp; Long-term Storage</h1>
+<h2>1. Đặt vấn đề và Thách thức Lưu trữ của Prometheus Local TSDB</h2>
+<p>Mặc dù TSDB của Prometheus rất nhanh và nhẹ, nhưng nó được thiết kế theo triết lý <strong>Local-First Single Node</strong>:</p>
+<ul>
+<li><strong>Nguy cơ Single Point of Failure (SPOF):</strong> Nếu máy chủ <code>mon-server</code> gặp sự cố phần cứng, toàn bộ hệ thống giám sát bị &quot;mù&quot; hoàn toàn.</li>
+<li><strong>Nguy cơ cạn kiệt ổ đĩa:</strong> Khi số lượng máy chủ tăng lên, dữ liệu chuỗi thời gian tăng nhanh chóng. Nếu không có cơ chế giới hạn chặt chẽ, ổ đĩa bị đầy (Disk Full) sẽ làm crash tiến trình Prometheus và hỏng cơ sở dữ liệu TSDB.</li>
+<li><strong>Thiếu tính năng phân tán:</strong> Prometheus không hỗ trợ gom cụm (Clustering) hoặc lưu trữ dữ liệu lịch sử nhiều năm (Long-term retention) trên các giải pháp lưu trữ rẻ tiền.</li>
+</ul>
+<hr />
+<h2>2. Chiến lược Tối ưu hóa Local Storage &amp; Retention</h2>
+<p>Để bảo vệ máy chủ giám sát khỏi nguy cơ cạn kiệt tài nguyên đĩa, chiến lược quản trị đĩa 3 tầng được áp dụng:</p>
+<h3>2.1. Phân vùng đĩa chuyên dụng với cờ tối ưu <code>noatime</code></h3>
+<p>Dữ liệu TSDB tuyệt đối không nên lưu chung trên phân vùng gốc <code>/</code>. Ta mount một phân vùng riêng biệt vào <code>/var/lib/prometheus</code> với tùy chọn <code>noatime,nodiratime,data=ordered</code> để vô hiệu hóa việc ghi cập nhật thời gian truy cập file, giảm 20-30% thao tác I/O ghi đĩa:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Thêm vào /etc/fstab trên mon-server</span>
+/dev/sdb1<span class="w">  </span>/var/lib/prometheus<span class="w">  </span>ext4<span class="w">  </span>noatime,nodiratime,data<span class="o">=</span>ordered,errors<span class="o">=</span>remount-ro<span class="w">  </span><span class="m">0</span><span class="w">  </span><span class="m">2</span>
+</code></pre></div></code></pre>
+<h3>2.2. Tinh chỉnh Retention Time, Retention Size và Nén WAL</h3>
+<p>Thiết lập các tham số khởi chạy của Prometheus trong <code>/etc/default/prometheus</code> hoặc file service systemd:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># /etc/default/prometheus</span>
+<span class="nv">ARGS</span><span class="o">=</span><span class="s2">"--config.file=/etc/prometheus/prometheus.yml \</span>
+<span class="s2">      --storage.tsdb.path=/var/lib/prometheus/data \</span>
+<span class="s2">      --storage.tsdb.retention.time=15d \</span>
+<span class="s2">      --storage.tsdb.retention.size=10GB \</span>
+<span class="s2">      --storage.tsdb.wal-compression \</span>
+<span class="s2">      --web.enable-lifecycle"</span>
+</code></pre></div></code></pre>
+<ul>
+<li><code>--storage.tsdb.retention.time=15d</code>: Chỉ giữ dữ liệu cục bộ tối đa 15 ngày.</li>
+<li><code>--storage.tsdb.retention.size=10GB</code>: Giới hạn tổng dung lượng thư mục TSDB không vượt quá 10GB (cơ chế dọn dẹp kích hoạt theo nguyên tắc FIFO: khối nào chạm ngưỡng trước sẽ bị xóa trước).</li>
+<li><code>--storage.tsdb.wal-compression</code>: Kích hoạt nén thuật toán Snappy cho Write-Ahead Log, giảm 30-40% kích thước các tệp WAL trên đĩa.</li>
+</ul>
+<hr />
+<h2>3. Kiến trúc High Availability (HA Replicas) Active-Active</h2>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart TD
+    subgraph Target_Cluster ["Cụm Máy chủ Mục tiêu"]
+        Target["mon-target :9100"]
+    end
+
+    subgraph HA_Prometheus ["Prometheus Dual Replicas Active-Active"]
+        Prom1["Prometheus 01 (Replica A)"]
+        Prom2["Prometheus 02 (Replica B)"]
+    end
+
+    subgraph Deduplication_Layer ["Alertmanager Cluster"]
+        AM1["Alertmanager 01"]
+        AM2["Alertmanager 02"]
+    end
+
+    Target -->|Scrape song song| Prom1
+    Target -->|Scrape song song| Prom2
+
+    Prom1 -->|Bắn cảnh báo độc lập| AM1
+    Prom1 -->|Bắn cảnh báo độc lập| AM2
+    Prom2 -->|Bắn cảnh báo độc lập| AM1
+    Prom2 -->|Bắn cảnh báo độc lập| AM2
+
+    AM1 <-->|Mesh Gossip / Đồng bộ trạng thái| AM2
+    AM1 -->|Khử trùng lặp -> Chỉ gửi 1 tin| Telegram["Telegram Bot"]
+</pre></div></code></pre>
+<h3>Cơ chế Khử trùng lặp (Deduplication) của Alertmanager:</h3>
+<p>Cả hai Prometheus Replicas cùng cào một máy chủ và độc lập phát hiện sự cố. Khi sự cố xảy ra, cả 2 con cùng bắn cảnh báo sang Alertmanager. Nhờ thuật toán băm (Fingerprint) dựa trên tập nhãn (<code>labels</code>) và cửa sổ gom nhóm (<code>group_wait</code>), Alertmanager tự động nhận diện 2 cảnh báo này là một và chỉ phát duy nhất <strong>1 thông báo</strong> đến Telegram.</p>
+<hr />
+<h2>4. Lưu trữ Dài hạn (LTS) với Thanos Sidecar và MinIO Object Storage</h2>
+<p>Để lưu trữ dữ liệu hàng năm trời mà không làm nặng máy chủ Prometheus, giải pháp <strong>Thanos</strong> kết hợp <strong>MinIO (S3-Compatible Object Storage)</strong> được triển khai:</p>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart LR
+    PromTSDB[("Prometheus TSDB")] -->|Cứ 2 giờ đóng băng block| ThanosSidecar["Thanos Sidecar"]
+    ThanosSidecar -->|Tự động đẩy khối 2h| MinIO[("MinIO Object Storage / S3")]
+    
+    GrafanaUser["Grafana"] -->|Truy vấn dữ liệu| ThanosQuerier["Thanos Querier"]
+    ThanosQuerier -->|Truy vấn dữ liệu Realtime| ThanosSidecar
+    ThanosQuerier -->|Truy vấn dữ liệu Lịch sử nhiều tháng| ThanosStore["Thanos Store Gateway"]
+    ThanosStore --> MinIO
+</pre></div></code></pre>
+<h3>Bước 1: Khởi tạo MinIO Bucket</h3>
+<p>Cài đặt MinIO và tạo bucket chuyên dụng <code>prometheus-longterm</code>:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Tải binary MinIO</span>
+wget<span class="w"> </span>https://dl.min.io/server/minio/release/linux-amd64/minio
+chmod<span class="w"> </span>+x<span class="w"> </span>minio<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>sudo<span class="w"> </span>mv<span class="w"> </span>minio<span class="w"> </span>/usr/local/bin/
+
+<span class="c1"># Khởi chạy MinIO lưu trữ tại /mnt/minio-storage</span>
+<span class="nv">MINIO_ROOT_USER</span><span class="o">=</span>admin<span class="w"> </span><span class="nv">MINIO_ROOT_PASSWORD</span><span class="o">=</span>StrongPassword123<span class="w"> </span>minio<span class="w"> </span>server<span class="w"> </span>/mnt/minio-storage<span class="w"> </span>--address<span class="w"> </span><span class="s2">":9000"</span><span class="w"> </span>--console-address<span class="w"> </span><span class="s2">":9001"</span><span class="w"> </span><span class="p">&amp;</span>
+</code></pre></div></code></pre>
+<h3>Bước 2: Cấu hình Thanos Bucket Configuration (<code>bucket.yml</code>)</h3>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">S3</span>
+<span class="nt">config</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">bucket</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus-longterm</span>
+<span class="w">  </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">127.0.0.1:9000</span>
+<span class="w">  </span><span class="nt">access_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin</span>
+<span class="w">  </span><span class="nt">secret_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StrongPassword123</span>
+<span class="w">  </span><span class="nt">insecure</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div></code></pre>
+<h3>Bước 3: Khởi chạy Thanos Sidecar song hành cùng Prometheus</h3>
+<p>Thanos Sidecar gắn trực tiếp vào thư mục TSDB của Prometheus, giám sát các block 2 giờ mới được nén và đẩy ngay lên MinIO bucket:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">thanos<span class="w"> </span>sidecar<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tsdb.path<span class="o">=</span>/var/lib/prometheus/data<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prometheus.url<span class="o">=</span>http://localhost:9090<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--objstore.config-file<span class="o">=</span>/etc/thanos/bucket.yml<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--grpc-address<span class="o">=</span><span class="m">0</span>.0.0.0:10901<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--http-address<span class="o">=</span><span class="m">0</span>.0.0.0:10902
+</code></pre></div></code></pre>
+<h3>Bước 4: Khởi chạy Thanos Querier phục vụ Grafana</h3>
+<p>Thanos Querier cung cấp giao diện PromQL tương thích 100% với Prometheus nhưng có khả năng gộp dữ liệu từ nhiều Sidecar và tự động khử trùng lặp (Deduplication):</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">thanos<span class="w"> </span>query<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--http-address<span class="o">=</span><span class="m">0</span>.0.0.0:9091<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--store<span class="o">=</span><span class="m">127</span>.0.0.1:10901<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--query.replica-label<span class="o">=</span>replica
+</code></pre></div></code></pre>
+<p>Trên Grafana, chỉ cần cấu hình Data Source trỏ vào cổng <code>9091</code> của Thanos Querier, người quản trị có thể xem xuyên suốt từ dữ liệu thời gian thực tới dữ liệu của 1 năm trước.</p>
+<hr />
+<h2>5. Kịch bản Kiểm chứng Tính sẵn sàng và Failover</h2>
+<ol>
+<li>Khởi chạy song song 2 replica Prometheus trên <code>mon-server</code> (cổng 9090 và 9092).</li>
+<li>Tạo truy vấn đồ thị liên tục trên Grafana thông qua Thanos Querier.</li>
+<li>Cố tình tắt dịch vụ của Replica 1: <code>sudo systemctl stop prometheus</code>.</li>
+<li><strong>Kết quả quan sát:</strong> Đồ thị trên Grafana không hề có khoảng trống (no gap), không suy suyển; Thanos Querier tự động chuyển toàn bộ luồng đọc sang Replica 2 trong suốt thời gian Replica 1 ngoại tuyến.</li>
+</ol>
+<hr />
+<h1>IV. Production Alerting</h1>
+<h2>1. Triết lý Vận hành và Hiện tượng &quot;Bão cảnh báo&quot; (Alert Fatigue)</h2>
+<p>Một trong những sai lầm phổ biến nhất khi triển khai hệ thống cảnh báo là thiết lập quá nhiều quy tắc nhạy cảm và gửi toàn bộ cảnh báo thô vào kênh chat chung. Khi hệ thống gặp sự cố lớn (ví dụ: máy chủ sập hoặc đường mạng đứt), hàng trăm tin nhắn cảnh báo rác ồ ạt đổ về cùng lúc. Hiện tượng này gọi là <strong>Bão cảnh báo (Alert Fatigue)</strong>, khiến kỹ sư trực ca bị quá tải thông tin, chai lì phản xạ và vô tình bỏ qua những cảnh báo nghiêm trọng thực sự.</p>
+<h3>4 Trụ cột Cảnh báo Chuẩn Production:</h3>
+<ol>
+<li><strong>Tính hành động (Actionability):</strong> Mỗi cảnh báo gửi đi phải đi kèm một hành động cụ thể để khắc phục. Nếu một cảnh báo phát ra mà kỹ sư &quot;không cần làm gì&quot;, cảnh báo đó phải bị xóa bỏ.</li>
+<li><strong>Ngữ cảnh rõ ràng (Clear Context):</strong> Thông báo phải ghi rõ máy chủ bị lỗi, thời gian xảy ra, giá trị ngưỡng bị vượt qua và liên kết trực tiếp tới Dashboard tương ứng.</li>
+<li><strong>Giảm thiểu nhiễu tối đa (Noise Reduction):</strong> Áp dụng triệt để cơ chế <strong>Gom cụm (Grouping)</strong> và <strong>Triệt tiêu (Inhibition)</strong>.</li>
+<li><strong>Độ tin cậy cao (High Reliability):</strong> Đảm bảo tin nhắn cảnh báo được gửi đi kể cả khi một kênh thông báo phụ bị nghẽn.</li>
+</ol>
+<hr />
+<h2>2. Kiến trúc Cảnh báo 3 Lớp (Detection - Processing - Notification)</h2>
+<p>Hệ thống cảnh báo được phân tách rành mạch thành 3 lớp chuyên biệt:</p>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart TD
+    subgraph Layer1 ["Lớp 1: Phát hiện - Detection"]
+        Prom["Prometheus Server"]
+        RuleEngine["Rule Evaluation Engine"]
+        Prom --> RuleEngine
+    end
+
+    subgraph Layer2 ["Lớp 2: Xử lý & Định tuyến - Alertmanager"]
+        AM["Alertmanager Core"]
+        Grouping["Gom cụm - Grouping"]
+        Inhibition["Triệt tiêu - Inhibition"]
+        Routing["Định tuyến - Routing Matrix"]
+        AM --> Grouping --> Inhibition --> Routing
+    end
+
+    subgraph Layer3 ["Lớp 3: Tiếp nhận - Notification Channels"]
+        Telegram["Telegram Bot Channel"]
+        Email["Email Ops"]
+        OnCall["PagerDuty / Opsgenie"]
+    end
+
+    RuleEngine -->|Bắn cảnh báo qua HTTP POST /api/v2/alerts| AM
+    Routing -->|Format mẫu HTML| Telegram
+    Routing -->|Cảnh báo Critical| OnCall
+</pre></div></code></pre>
+<hr />
+<h2>3. Quản lý Xung đột Cổng và Dịch vụ Systemd Alertmanager</h2>
+<h3>3.1. Phân bổ Bảng Cổng Chuẩn</h3>
+<p>Trong quá trình vận hành Linux Server, các ứng dụng giám sát thường xuyên bị xung đột cổng với các tiến trình khác. Bảng quy hoạch cổng chuẩn mực của hệ thống:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Cổng</th>
+<th style="text-align:left">Dịch vụ chuẩn</th>
+<th style="text-align:left">Ứng dụng thường xung đột</th>
+<th style="text-align:left">Cách xử lý</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong><code>3000</code></strong></td>
+<td style="text-align:left">Grafana Web Server</td>
+<td style="text-align:left">Node.js, n8n, React dev</td>
+<td style="text-align:left">Đổi Grafana sang port khác trong <code>grafana.ini</code> nếu cần.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong><code>9090</code></strong></td>
+<td style="text-align:left">Prometheus Web &amp; TSDB</td>
+<td style="text-align:left">Cockpit Web Console (Debian/Ubuntu)</td>
+<td style="text-align:left">Tắt Cockpit: <code>systemctl stop cockpit.socket</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong><code>9093</code></strong></td>
+<td style="text-align:left">Alertmanager Web API</td>
+<td style="text-align:left">Dịch vụ nội bộ tùy biến</td>
+<td style="text-align:left">Giữ mặc định cho Alertmanager.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong><code>9100</code></strong></td>
+<td style="text-align:left">Node Exporter</td>
+<td style="text-align:left">Cổng máy in mạng (JetDirect printer)</td>
+<td style="text-align:left">Giữ mặc định trên máy chủ Linux.</td>
+</tr>
+</tbody>
+</table>
+<p>Kiểm tra tiến trình đang chiếm cổng:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">sudo<span class="w"> </span>ss<span class="w"> </span>-tulpn<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-E<span class="w"> </span><span class="s1">':(3000|9090|9093|9100)'</span>
+</code></pre></div></code></pre>
+<h3>3.2. Cấu hình Dịch vụ Systemd Chuyên dụng cho Alertmanager</h3>
+<p>Tạo tài khoản hệ thống chuyên trách không có shell đăng nhập nhằm tăng cường an ninh:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">sudo<span class="w"> </span>useradd<span class="w"> </span>--no-create-home<span class="w"> </span>--shell<span class="w"> </span>/bin/false<span class="w"> </span>alertmanager
+sudo<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>/etc/alertmanager<span class="w"> </span>/var/lib/alertmanager
+sudo<span class="w"> </span>chown<span class="w"> </span>-R<span class="w"> </span>alertmanager:alertmanager<span class="w"> </span>/etc/alertmanager<span class="w"> </span>/var/lib/alertmanager
+</code></pre></div></code></pre>
+<p>Tạo file dịch vụ systemd <code>/etc/systemd/system/alertmanager.service</code>:</p>
+<pre><code class="language-ini"><div class="highlight cmd-box"><div class="lang-badge">ini</div><pre><code class="language-ini"><span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Prometheus Alertmanager</span>
+<span class="na">Wants</span><span class="o">=</span><span class="s">network-online.target</span>
+<span class="na">After</span><span class="o">=</span><span class="s">network-online.target</span>
+
+<span class="k">[Service]</span>
+<span class="na">User</span><span class="o">=</span><span class="s">alertmanager</span>
+<span class="na">Group</span><span class="o">=</span><span class="s">alertmanager</span>
+<span class="na">Type</span><span class="o">=</span><span class="s">simple</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/usr/bin/prometheus-alertmanager </span>\
+<span class="w">    </span><span class="s">--config.file=/etc/alertmanager/alertmanager.yml </span>\
+<span class="w">    </span><span class="s">--storage.path=/var/lib/alertmanager/data </span>\
+<span class="w">    </span><span class="s">--web.listen-address=0.0.0.0:9093 </span>\
+<span class="w">    </span><span class="s">--cluster.listen-address=""</span>
+
+<span class="na">Restart</span><span class="o">=</span><span class="s">always</span>
+<span class="na">RestartSec</span><span class="o">=</span><span class="s">5s</span>
+
+<span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>4. Cơ chế Nâng cao: Gom cụm (Grouping) và Triệt tiêu (Inhibition)</h2>
+<p>Cấu hình chi tiết tệp <code>/etc/alertmanager/alertmanager.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">global</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">resolve_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+
+<span class="nt">templates</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'/etc/alertmanager/alert.tmpl'</span>
+
+<span class="nt">route</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">group_by</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'alertname'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'instance'</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">'severity'</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">group_wait</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10s</span>
+<span class="w">  </span><span class="nt">group_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w">  </span><span class="nt">repeat_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2h</span>
+<span class="w">  </span><span class="nt">receiver</span><span class="p">:</span><span class="w"> </span><span class="s">'telegram-bot'</span>
+
+<span class="nt">receivers</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'telegram-bot'</span>
+<span class="w">    </span><span class="nt">telegram_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">bot_token</span><span class="p">:</span><span class="w"> </span><span class="s">'YOUR_TELEGRAM_BOT_TOKEN'</span>
+<span class="w">        </span><span class="nt">chat_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-1001234567890</span>
+<span class="w">        </span><span class="nt">parse_mode</span><span class="p">:</span><span class="w"> </span><span class="s">'HTML'</span>
+<span class="w">        </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">'{{</span><span class="nv"> </span><span class="s">template</span><span class="nv"> </span><span class="s">"telegram.html"</span><span class="nv"> </span><span class="s">.</span><span class="nv"> </span><span class="s">}}'</span>
+
+<span class="nt">inhibit_rules</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_match</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">alertname</span><span class="p">:</span><span class="w"> </span><span class="s">'NodeExporterDown'</span>
+<span class="w">      </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="s">'critical'</span>
+<span class="w">    </span><span class="nt">target_match_re</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">alertname</span><span class="p">:</span><span class="w"> </span><span class="s">'HostHighCpuUsage|HostOutOfMemory|HostOutOfDiskSpace'</span>
+<span class="w">    </span><span class="nt">equal</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'instance'</span><span class="p p-Indicator">]</span>
+</code></pre></div></code></pre>
+<h3>Ý nghĩa của các tham số:</h3>
+<ul>
+<li><strong><code>group_wait: 10s</code>:</strong> Khi một cảnh báo xuất hiện, Alertmanager đợi thêm 10 giây để xem có cảnh báo nào cùng nhóm phát sinh hay không, sau đó gộp tất cả vào <strong>một tin nhắn duy nhất</strong>.</li>
+<li><strong><code>group_interval: 1m</code>:</strong> Khoảng thời gian gửi cập nhật nếu có thêm cảnh báo mới phát sinh trong nhóm đang diễn ra.</li>
+<li><strong><code>repeat_interval: 2h</code>:</strong> Nếu sự cố vẫn tiếp diễn mà chưa được xử lý, phải chờ đúng 2 tiếng sau Alertmanager mới nhắc lại, tránh spam kênh chat.</li>
+<li><strong><code>inhibit_rules</code> (Cơ chế Triệt tiêu):</strong> Nếu một máy chủ bị sập (<code>NodeExporterDown</code> mức <code>critical</code>), hiển nhiên CPU và RAM của máy đó sẽ không thể thu thập được. Quy tắc này tự động <strong>dập tắt các cảnh báo phụ</strong> (<code>HostHighCpuUsage</code>, <code>HostOutOfMemory</code>), giúp kỹ sư tập trung chính xác vào nguyên nhân gốc: máy chủ đã bị tắt nguồn.</li>
+</ul>
+<hr />
+<h2>5. Thiết kế Mẫu thông báo Telegram HTML và Sửa lỗi Timestamp</h2>
+<h3>Khắc phục lỗi rỗng thời gian (Empty Variable Bug)</h3>
+<p>Trong các phiên bản Go Template mới của Alertmanager, biến cấp cao <code>.StartsAt</code> không còn tồn tại ngoài vòng lặp. Nếu truy cập trực tiếp <code>{{ .StartsAt }}</code>, tin nhắn sẽ bị rỗng thời gian. Mẫu cấu hình chuẩn dưới đây giải quyết triệt để vấn đề này bằng cách duyệt mảng <code>{{ range .Alerts }}</code> và chuyển đổi về múi giờ địa phương:</p>
+<p>Tạo tệp mẫu giao diện <code>/etc/alertmanager/alert.tmpl</code>:</p>
+<pre><code class="language-gotemplate"><div class="highlight cmd-box"><div class="lang-badge">gotemplate</div><pre><code class="language-gotemplate">{{ define "telegram.html" }}
+{{ if eq .Status "firing" }}
+🚨 &lt;b&gt;HỆ THỐNG CẢNH BÁO SỰ CỐ PRODUCTION&lt;/b&gt; 🚨
+{{ else }}
+✅ &lt;b&gt;SỰ CỐ ĐÃ ĐƯỢC KHẮC PHỤC THÀNH CÔNG&lt;/b&gt; ✅
+{{ end }}
+
+{{ range .Alerts }}
+&lt;b&gt;Trạng thái:&lt;/b&gt; {{ if eq .Status "firing" }}🔥 &lt;code&gt;ĐANG PHÁT SINH&lt;/code&gt;{{ else }}💚 &lt;code&gt;ĐÃ PHỤC HỒI&lt;/code&gt;{{ end }}
+&lt;b&gt;Cảnh báo:&lt;/b&gt; &lt;code&gt;{{ .Labels.alertname }}&lt;/code&gt;
+&lt;b&gt;Mức độ:&lt;/b&gt; &lt;code&gt;{{ .Labels.severity | toUpper }}&lt;/code&gt;
+&lt;b&gt;Máy chủ:&lt;/b&gt; &lt;code&gt;{{ .Labels.instance }}&lt;/code&gt;
+&lt;b&gt;Môi trường:&lt;/b&gt; &lt;code&gt;{{ .Labels.environment }}&lt;/code&gt;
+
+&lt;b&gt;Chi tiết:&lt;/b&gt; {{ .Annotations.description }}
+&lt;b&gt;Thời gian:&lt;/b&gt; &lt;code&gt;{{ .StartsAt.Local.Format "15:04:05 02/01/2006" }}&lt;/code&gt;
+-------------------------------------
+{{ end }}
+&lt;i&gt;Vui lòng kiểm tra Grafana Dashboard để xử lý sự cố.&lt;/i&gt;
+{{ end }}
+</code></pre></div></code></pre>
+<hr />
+<h2>6. Chuẩn hóa Alerting Rules và Khắc phục Sai lệch Công thức RAM</h2>
+<h3>Khắc phục sai lệch công thức RAM trong Linux</h3>
+<p>Nhiều tài liệu hướng dẫn dùng công thức:</p>
+<pre><code class="language-promql"><div class="highlight cmd-box"><div class="lang-badge">promql</div><pre><code class="language-promql"><span class="c1"># CÔNG THỨC SAI LẦM:</span>
+<span class="o">(</span><span class="mi">1</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="o">(</span><span class="nv">node_memory_MemFree_bytes</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">node_memory_MemTotal_bytes</span><span class="o">))</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">80</span>
+</code></pre></div></code></pre>
+<p>Trong hệ điều hành Linux, kernel chủ động tận dụng RAM rảnh rỗi để làm bộ đệm Buffer và Cache (Page Cache). Lượng RAM này có thể được thu hồi ngay lập tức khi ứng dụng cần. Do đó, <code>MemFree</code> thường rất thấp nhưng hệ thống vẫn hoàn toàn khỏe mạnh. Sử dụng <code>MemFree</code> sẽ tạo ra hàng loạt cảnh báo giả.</p>
+<p><strong>Công thức chuẩn xác của Linux SysAdmin:</strong></p>
+<pre><code class="language-promql"><div class="highlight cmd-box"><div class="lang-badge">promql</div><pre><code class="language-promql"><span class="o">(</span><span class="nv">node_memory_MemTotal_bytes</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">node_memory_MemAvailable_bytes</span><span class="o">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">node_memory_MemTotal_bytes</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">80</span>
+</code></pre></div></code></pre>
+<h3>File cấu hình quy tắc hoàn chỉnh <code>/etc/prometheus/alert_rules.yml</code>:</h3>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">groups</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production_node_alerts</span>
+<span class="w">    </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># 1. Cảnh báo máy chủ hoặc Node Exporter sập</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NodeExporterDown</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">up{job="node_exporter"} == 0</span>
+<span class="w">        </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30s</span>
+<span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w">        </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">"Máy</span><span class="nv"> </span><span class="s">chủ</span><span class="nv"> </span><span class="s">giám</span><span class="nv"> </span><span class="s">sát</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.instance</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">bị</span><span class="nv"> </span><span class="s">mất</span><span class="nv"> </span><span class="s">kết</span><span class="nv"> </span><span class="s">nối!"</span>
+<span class="w">          </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Prometheus</span><span class="nv"> </span><span class="s">không</span><span class="nv"> </span><span class="s">thể</span><span class="nv"> </span><span class="s">cào</span><span class="nv"> </span><span class="s">dữ</span><span class="nv"> </span><span class="s">liệu</span><span class="nv"> </span><span class="s">từ</span><span class="nv"> </span><span class="s">Node</span><span class="nv"> </span><span class="s">Exporter</span><span class="nv"> </span><span class="s">trên</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.instance</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">trong</span><span class="nv"> </span><span class="s">hơn</span><span class="nv"> </span><span class="s">30</span><span class="nv"> </span><span class="s">giây."</span>
+
+<span class="w">      </span><span class="c1"># 2. Cảnh báo quá tải CPU</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HostHighCpuUsage</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)) &gt; 80</span>
+<span class="w">        </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w">        </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">"Tải</span><span class="nv"> </span><span class="s">CPU</span><span class="nv"> </span><span class="s">cao</span><span class="nv"> </span><span class="s">trên</span><span class="nv"> </span><span class="s">máy</span><span class="nv"> </span><span class="s">chủ</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.instance</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Mức</span><span class="nv"> </span><span class="s">sử</span><span class="nv"> </span><span class="s">dụng</span><span class="nv"> </span><span class="s">CPU</span><span class="nv"> </span><span class="s">đạt</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">printf</span><span class="nv"> </span><span class="s">\"%.2f\"</span><span class="nv"> </span><span class="s">}}%</span><span class="nv"> </span><span class="s">(vượt</span><span class="nv"> </span><span class="s">ngưỡng</span><span class="nv"> </span><span class="s">80%)</span><span class="nv"> </span><span class="s">trong</span><span class="nv"> </span><span class="s">hơn</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">phút."</span>
+
+<span class="w">      </span><span class="c1"># 3. Cảnh báo cạn kiệt bộ nhớ RAM</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HostOutOfMemory</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100) &gt; 80</span>
+<span class="w">        </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w">        </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">"Bộ</span><span class="nv"> </span><span class="s">nhớ</span><span class="nv"> </span><span class="s">RAM</span><span class="nv"> </span><span class="s">sắp</span><span class="nv"> </span><span class="s">cạn</span><span class="nv"> </span><span class="s">trên</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.instance</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Bộ</span><span class="nv"> </span><span class="s">nhớ</span><span class="nv"> </span><span class="s">RAM</span><span class="nv"> </span><span class="s">đang</span><span class="nv"> </span><span class="s">sử</span><span class="nv"> </span><span class="s">dụng</span><span class="nv"> </span><span class="s">ở</span><span class="nv"> </span><span class="s">mức</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">printf</span><span class="nv"> </span><span class="s">\"%.2f\"</span><span class="nv"> </span><span class="s">}}%</span><span class="nv"> </span><span class="s">(vượt</span><span class="nv"> </span><span class="s">ngưỡng</span><span class="nv"> </span><span class="s">80%)</span><span class="nv"> </span><span class="s">trong</span><span class="nv"> </span><span class="s">hơn</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">phút."</span>
+
+<span class="w">      </span><span class="c1"># 4. Cảnh báo sắp đầy ổ đĩa</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HostOutOfDiskSpace</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100) &gt; 85</span>
+<span class="w">        </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w">        </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w">        </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w">          </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">"Phân</span><span class="nv"> </span><span class="s">vùng</span><span class="nv"> </span><span class="s">gốc</span><span class="nv"> </span><span class="s">sắp</span><span class="nv"> </span><span class="s">đầy</span><span class="nv"> </span><span class="s">trên</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.instance</span><span class="nv"> </span><span class="s">}}"</span>
+<span class="w">          </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">"Dung</span><span class="nv"> </span><span class="s">lượng</span><span class="nv"> </span><span class="s">ổ</span><span class="nv"> </span><span class="s">cứng</span><span class="nv"> </span><span class="s">phân</span><span class="nv"> </span><span class="s">vùng</span><span class="nv"> </span><span class="s">/</span><span class="nv"> </span><span class="s">đã</span><span class="nv"> </span><span class="s">sử</span><span class="nv"> </span><span class="s">dụng</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">printf</span><span class="nv"> </span><span class="s">\"%.2f\"</span><span class="nv"> </span><span class="s">}}%</span><span class="nv"> </span><span class="s">(ngưỡng</span><span class="nv"> </span><span class="s">an</span><span class="nv"> </span><span class="s">toàn</span><span class="nv"> </span><span class="s">&lt;</span><span class="nv"> </span><span class="s">85%)."</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>7. Bộ công cụ Kiểm thử Tự động và Kịch bản Demo Thực tế</h2>
+<h3>7.1. Script Ép Tải RAM Thông Minh: <code>auto_stress.py</code></h3>
+<p>Khi thực hiện demo cảnh báo RAM, nếu dùng lệnh <code>stress</code> với dung lượng tùy tiện, Linux Kernel OOM-Killer (Out of Memory Killer) sẽ lập tức tiêu diệt tiến trình trước khi Prometheus kịp cào dữ liệu. Script <code>auto_stress.py</code> tự động đo đạc dung lượng RAM khả dụng thực tế và tính toán chính xác phần dung lượng (delta MB) cần cấp phát để chạm ngưỡng mục tiêu (ví dụ: 85%) một cách mượt mà và an toàn:</p>
+<pre><code class="language-python"><div class="highlight cmd-box"><div class="lang-badge">python</div><pre><code class="language-python"><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># scripts/auto_stress.py</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">psutil</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">auto_stress</span><span class="p">(</span><span class="n">target_percent</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">duration</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">180</span><span class="p">):</span>
+    <span class="n">mem</span> <span class="o">=</span> <span class="n">psutil</span><span class="o">.</span><span class="n">virtual_memory</span><span class="p">()</span>
+    <span class="n">total_mb</span> <span class="o">=</span> <span class="n">mem</span><span class="o">.</span><span class="n">total</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+    <span class="n">used_mb</span> <span class="o">=</span> <span class="n">mem</span><span class="o">.</span><span class="n">used</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">)</span>
+    <span class="n">current_percent</span> <span class="o">=</span> <span class="n">mem</span><span class="o">.</span><span class="n">percent</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Tổng RAM: </span><span class="si">{</span><span class="n">total_mb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB | Đang dùng: </span><span class="si">{</span><span class="n">used_mb</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> MB (</span><span class="si">{</span><span class="n">current_percent</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%)"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Mức % mục tiêu: </span><span class="si">{</span><span class="n">target_percent</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% | Thời gian: </span><span class="si">{</span><span class="n">duration</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">target_percent</span> <span class="o">&lt;=</span> <span class="n">current_percent</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"[!] RAM hiện tại đã vượt mức mục tiêu."</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">target_used_mb</span> <span class="o">=</span> <span class="n">total_mb</span> <span class="o">*</span> <span class="p">(</span><span class="n">target_percent</span> <span class="o">/</span> <span class="mf">100.0</span><span class="p">)</span>
+    <span class="n">needed_mb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">target_used_mb</span> <span class="o">-</span> <span class="n">used_mb</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[+] Đang ép thêm </span><span class="si">{</span><span class="n">needed_mb</span><span class="si">}</span><span class="s2"> MB RAM để đạt mức </span><span class="si">{</span><span class="n">target_percent</span><span class="si">}</span><span class="s2">%..."</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"stress"</span><span class="p">,</span> <span class="s2">"--vm"</span><span class="p">,</span> <span class="s2">"1"</span><span class="p">,</span> <span class="s2">"--vm-bytes"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">needed_mb</span><span class="si">}</span><span class="s2">M"</span><span class="p">,</span> <span class="s2">"--timeout"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">duration</span><span class="si">}</span><span class="s2">s"</span><span class="p">]</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"[+] Hoàn tất chu kỳ ép tải! Hệ thống đang giải phóng RAM..."</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">target</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mf">85.0</span>
+    <span class="n">dur</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="mi">180</span>
+    <span class="n">auto_stress</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">dur</span><span class="p">)</span>
+</code></pre></div></code></pre>
+<h3>7.2. Kịch bản Thực nghiệm 1: Vòng đời Alert (Pending → Firing → Resolved)</h3>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">sequenceDiagram
+    autonumber
+    actor Tester as Kỹ sư Thử nghiệm
+    participant Target as mon-target
+    participant Prom as Prometheus
+    participant AM as Alertmanager
+    participant Tele as Telegram Bot
+
+    Tester->>Target: Chạy auto_stress.py 85 180
+    Note over Target: RAM vượt ngưỡng 80%
+    Target-->>Prom: Scrape metrics (RAM = 85%)
+    Note over Prom: Trạng thái: PENDING (đợi đủ 1m)
+    Note over Prom: Đủ 1m chuyển sang FIRING
+    Prom->>AM: Bắn Alert (HostOutOfMemory)
+    AM->>AM: Gom cụm (group_wait 10s)
+    AM->>Tele: Gửi tin nhắn HTML cảnh báo sự cố 🚨
+    Note over Target: Hết 180s tự giải phóng RAM về bình thường
+    Target-->>Prom: Scrape metrics (RAM < 80%)
+    Note over Prom: Chuyển sang RESOLVED
+    Prom->>AM: Bắn thông báo phục hồi
+    AM->>Tele: Gửi tin nhắn xác nhận đã khắc phục ✅
+</pre></div></code></pre>
+<h3>7.3. Kịch bản Thực nghiệm 2: Kiểm chứng Cơ chế Triệt tiêu (Alert Inhibition)</h3>
+<ol>
+<li><strong>Bước 1: Ép tải CPU trên <code>mon-target</code>:</strong><pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">stress-ng<span class="w"> </span>--cpu<span class="w"> </span><span class="m">1</span><span class="w"> </span>--cpu-load<span class="w"> </span><span class="m">95</span><span class="w"> </span>--timeout<span class="w"> </span>180s<span class="w"> </span><span class="p">&amp;</span>
+</code></pre></div></code></pre>
+Sau 1 phút, cảnh báo <code>HostHighCpuUsage</code> (<code>warning</code>) kích hoạt và gửi tin nhắn cảnh báo CPU về Telegram.</li>
+<li><strong>Bước 2: Cố tình tắt dịch vụ Node Exporter:</strong><pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>prometheus-node-exporter
+</code></pre></div></code></pre>
+</li>
+<li><strong>Bước 3: Quan sát kết quả:</strong>
+<ul>
+<li>Sau 30 giây, Prometheus phát hiện <code>up == 0</code> và kích hoạt cảnh báo <code>NodeExporterDown</code> (<code>critical</code>).</li>
+<li>Alertmanager nhận được cả 2 cảnh báo: <code>NodeExporterDown</code> (<code>critical</code>) và <code>HostHighCpuUsage</code> (<code>warning</code>).</li>
+<li>Nhờ có <code>inhibit_rules</code>, Alertmanager <strong>chủ động triệt tiêu cảnh báo CPU</strong> và <strong>chỉ gửi thông báo duy nhất về việc NodeExporter bị sập</strong>.</li>
+<li>Hộp thoại Web UI của Alertmanager hiển thị nhãn: <code>Inhibited by: NodeExporterDown</code>. Kỹ sư hoàn toàn không bị phân tâm bởi các thông báo sai lệch.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h1>V. Security and Auth</h1>
+<h2>1. Mô hình Đe dọa An ninh (Threat Model) đối với Hệ thống Monitoring</h2>
+<p>Mặc định, các thành phần của hệ thống giám sát (Prometheus, Node Exporter, Alertmanager) giao tiếp qua giao thức HTTP không mã hóa và không có cơ chế xác thực danh tính. Trong môi trường doanh nghiệp, điều này tạo ra các lỗ hổng an ninh nghiêm trọng:</p>
+<ol>
+<li><strong>Nghe lén dữ liệu đường truyền (Network Sniffing / Man-in-the-Middle):</strong> Kẻ tấn công trong cùng mạng nội bộ có thể bắt các gói tin HTTP để nắm toàn bộ thông tin topology máy chủ, dung lượng bộ nhớ, lưu lượng giao dịch và các endpoint ứng dụng nhạy cảm.</li>
+<li><strong>Can thiệp phá hoại dữ liệu (Data Tampering &amp; TSDB Deletion):</strong> Nếu bật cờ <code>--web.enable-admin-api</code>, kẻ tấn công có thể gửi yêu cầu HTTP POST để xóa sạch toàn bộ cơ sở dữ liệu chuỗi thời gian của doanh nghiệp.</li>
+<li><strong>Chiếm quyền điều khiển Dashboard:</strong> Grafana nếu để đăng ký tự do hoặc cho phép truy cập nặc danh (Anonymous access) sẽ khiến thông tin vận hành bị lộ lọt ra Internet.</li>
+</ol>
+<hr />
+<h2>2. Mã hóa Đường truyền Toàn diện qua TLS/HTTPS với Nginx Reverse Proxy</h2>
+<p>Giải pháp chuẩn công nghiệp là đặt một <strong>Nginx Reverse Proxy</strong> đóng vai trò SSL Termination tại cổng <code>443</code>, tự động chuyển hướng toàn bộ truy cập từ cổng <code>80</code> sang <code>443</code> và bổ sung các HTTP Security Headers.</p>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart LR
+    Browser["Trình duyệt / Người dùng"] -->|HTTPS 443 / Mã hóa TLS 1.3| Nginx["Nginx Reverse Proxy"]
+    Browser -.->|HTTP 80| Nginx
+    Nginx -.->|301 Redirect sang HTTPS| Browser
+    
+    subgraph Internal_Only ["Localhost Only (127.0.0.1)"]
+        Nginx -->|Proxy pass| GrafanaLocal["Grafana :3000"]
+        Nginx -->|Proxy pass + Basic Auth| PromLocal["Prometheus :9090"]
+        Nginx -->|Proxy pass + Basic Auth| AMLocal["Alertmanager :9093"]
+    end
+</pre></div></code></pre>
+<h3>File cấu hình Nginx Reverse Proxy (<code>/etc/nginx/sites-available/monitoring.conf</code>):</h3>
+<pre><code class="language-nginx"><div class="highlight cmd-box"><div class="lang-badge">nginx</div><pre><code class="language-nginx"><span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">80</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">monitoring.lab.internal</span><span class="p">;</span>
+<span class="w">    </span><span class="c1"># Tự động chuyển hướng toàn bộ sang HTTPS</span>
+<span class="w">    </span><span class="kn">return</span><span class="w"> </span><span class="mi">301</span><span class="w"> </span><span class="s">https://</span><span class="nv">$host$request_uri</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="k">server</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kn">listen</span><span class="w"> </span><span class="mi">443</span><span class="w"> </span><span class="s">ssl</span><span class="w"> </span><span class="s">http2</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">server_name</span><span class="w"> </span><span class="s">monitoring.lab.internal</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kn">ssl_certificate</span><span class="w"> </span><span class="s">/etc/ssl/certs/monitoring.crt</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_certificate_key</span><span class="w"> </span><span class="s">/etc/ssl/private/monitoring.key</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Cấu hình bảo mật SSL/TLS chuẩn Mozilla Intermediate</span>
+<span class="w">    </span><span class="kn">ssl_protocols</span><span class="w"> </span><span class="s">TLSv1.2</span><span class="w"> </span><span class="s">TLSv1.3</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_ciphers</span><span class="w"> </span><span class="s">HIGH:!aNULL:!MD5</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">ssl_prefer_server_ciphers</span><span class="w"> </span><span class="no">on</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Bổ sung các HTTP Security Headers bắt buộc</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">Strict-Transport-Security</span><span class="w"> </span><span class="s">"max-age=31536000</span><span class="p">;</span><span class="w"> </span><span class="kn">includeSubDomains"</span><span class="w"> </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Frame-Options</span><span class="w"> </span><span class="s">"DENY"</span><span class="w"> </span><span class="s">always</span><span class="p">;</span>
+<span class="w">    </span><span class="kn">add_header</span><span class="w"> </span><span class="s">X-Content-Type-Options</span><span class="w"> </span><span class="s">"nosniff"</span><span class="w"> </span><span class="s">always</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1"># Proxy tới Grafana</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:3000</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">Host</span><span class="w"> </span><span class="nv">$host</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Real-IP</span><span class="w"> </span><span class="nv">$remote_addr</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-For</span><span class="w"> </span><span class="nv">$proxy_add_x_forwarded_for</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">proxy_set_header</span><span class="w"> </span><span class="s">X-Forwarded-Proto</span><span class="w"> </span><span class="s">https</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1"># Proxy tới Prometheus UI (yêu cầu Basic Auth)</span>
+<span class="w">    </span><span class="kn">location</span><span class="w"> </span><span class="s">/prometheus/</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kn">proxy_pass</span><span class="w"> </span><span class="s">http://127.0.0.1:9090/</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">auth_basic</span><span class="w"> </span><span class="s">"Khu</span><span class="w"> </span><span class="s">vuc</span><span class="w"> </span><span class="s">Quan</span><span class="w"> </span><span class="s">tri</span><span class="w"> </span><span class="s">Prometheus"</span><span class="p">;</span>
+<span class="w">        </span><span class="kn">auth_basic_user_file</span><span class="w"> </span><span class="s">/etc/nginx/.htpasswd</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>3. Xác thực Truy cập Web Basic Auth (bcrypt) cho Prometheus và Exporter</h2>
+<h3>3.1. Kích hoạt Web Basic Auth nội tại trên Prometheus (<code>web.yml</code>)</h3>
+<p>Từ phiên bản 2.24+, Prometheus hỗ trợ xác thực mã hóa trực tiếp bằng bcrypt thông qua tệp cấu hình web:</p>
+<p>Tạo mật khẩu mã hóa bcrypt:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Tạo user 'admin_prom' với mật khẩu mã hóa an toàn</span>
+htpasswd<span class="w"> </span>-B<span class="w"> </span>-C<span class="w"> </span><span class="m">10</span><span class="w"> </span>-c<span class="w"> </span>/etc/prometheus/web.htpasswd<span class="w"> </span>admin_prom
+</code></pre></div></code></pre>
+<p>Tạo file <code>/etc/prometheus/web.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">basic_auth_users</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">admin_prom</span><span class="p">:</span><span class="w"> </span><span class="s">"$2y$10$abcdefghijklmnopqrstuvwxyz..."</span><span class="w"> </span><span class="c1"># Chuỗi hash bcrypt từ htpasswd</span>
+</code></pre></div></code></pre>
+<p>Khai báo file web trong tham số khởi chạy của Prometheus:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">--web.config.file<span class="o">=</span>/etc/prometheus/web.yml
+</code></pre></div></code></pre>
+<h3>3.2. Bảo vệ Node Exporter trên <code>mon-target</code> bằng Basic Auth</h3>
+<p>Tương tự, Node Exporter có thể được khóa bằng tệp cấu hình <code>/etc/node_exporter/web-config.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">basic_auth_users</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">scrape_agent</span><span class="p">:</span><span class="w"> </span><span class="s">"$2y$10$1234567890abcdef..."</span>
+</code></pre></div></code></pre>
+<p>Khi đó, trong file cấu hình <code>prometheus.yml</code> trên <code>mon-server</code>, Prometheus phải khai báo thông tin đăng nhập khi cào dữ liệu:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">'node_exporter'</span>
+<span class="w">    </span><span class="nt">basic_auth</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="s">'scrape_agent'</span>
+<span class="w">      </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="s">'TargetStrongPassword123'</span>
+<span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'192.168.122.38:9100'</span><span class="p p-Indicator">]</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>4. Kiểm soát Phân quyền (RBAC) và Siết chặt Bảo mật Grafana</h2>
+<p>Chỉnh sửa tệp cấu hình <code>/etc/grafana/grafana.ini</code> để khóa chặt các lỗ hổng truy cập:</p>
+<pre><code class="language-ini"><div class="highlight cmd-box"><div class="lang-badge">ini</div><pre><code class="language-ini"><span class="k">[users]</span>
+<span class="c1"># Cấm người dùng lạ tự tạo tài khoản mới</span>
+<span class="na">allow_sign_up</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">false</span>
+<span class="na">auto_assign_org_role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">Viewer</span>
+
+<span class="k">[auth.anonymous]</span>
+<span class="c1"># Vô hiệu hóa tuyệt đối quyền truy cập nặc danh</span>
+<span class="na">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">false</span>
+
+<span class="k">[security]</span>
+<span class="c1"># Bảo mật cookie phiên làm việc</span>
+<span class="na">cookie_secure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">true</span>
+<span class="na">cookie_samesite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">lax</span>
+<span class="na">strict_transport_security</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">true</span>
+</code></pre></div></code></pre>
+<h3>Phân cấp quyền hạn trong đội ngũ (Role-Based Access Control):</h3>
+<ul>
+<li><strong>Admin:</strong> Có quyền thêm/xóa Data Source, cấu hình tài khoản, cấp phát token API.</li>
+<li><strong>Editor:</strong> Có quyền thiết kế biểu đồ, sửa Dashboard nhưng không được sửa cấu hình hệ thống.</li>
+<li><strong>Viewer:</strong> Chỉ có quyền xem biểu đồ thời gian thực, không thể chỉnh sửa PromQL hay cấu hình.</li>
+</ul>
+<hr />
+<h2>5. Tường lửa Hạ tầng UFW và Vô hiệu hóa Endpoint Quản trị Nhạy cảm</h2>
+<h3>5.1. Khóa Endpoint Quản trị TSDB (<code>--web.enable-admin-api</code>)</h3>
+<p>Tuyệt đối <strong>không kích hoạt</strong> cờ <code>--web.enable-admin-api</code> trong môi trường Production. Cờ này mở ra các API cực kỳ nguy hiểm như:</p>
+<ul>
+<li><code>POST /api/v1/admin/tsdb/delete_series</code>: Xóa sạch chuỗi dữ liệu.</li>
+<li><code>POST /api/v1/admin/tsdb/clean_tombstones</code>: Dọn dẹp vĩnh viễn không thể phục hồi.</li>
+</ul>
+<h3>5.2. Thiết lập Tường lửa UFW trên <code>mon-target</code></h3>
+<p>Máy chủ mục tiêu chỉ cho phép duy nhất IP của <code>mon-server</code> được cào cổng <code>9100</code>:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Thực hiện trên mon-target</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span>default<span class="w"> </span>deny<span class="w"> </span>incoming
+sudo<span class="w"> </span>ufw<span class="w"> </span>default<span class="w"> </span>allow<span class="w"> </span>outgoing
+sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span>from<span class="w"> </span><span class="m">192</span>.168.122.1<span class="w"> </span>to<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">22</span><span class="w"> </span>proto<span class="w"> </span>tcp<span class="w"> </span>comment<span class="w"> </span><span class="s2">"SSH Admin Host"</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span>from<span class="w"> </span><span class="m">192</span>.168.122.100<span class="w"> </span>to<span class="w"> </span>any<span class="w"> </span>port<span class="w"> </span><span class="m">9100</span><span class="w"> </span>proto<span class="w"> </span>tcp<span class="w"> </span>comment<span class="w"> </span><span class="s2">"Cho phep mon-server scrape"</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span><span class="nb">enable</span>
+</code></pre></div></code></pre>
+<h3>5.3. Cô lập Cổng Dịch vụ Nội bộ trên <code>mon-server</code></h3>
+<p>Các dịch vụ nội bộ (Grafana <code>3000</code>, Prometheus <code>9090</code>, Alertmanager <code>9093</code>) chỉ được bind vào <code>127.0.0.1</code>. Bên ngoài chỉ có thể kết nối qua cổng <code>443</code> của Nginx:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Thực hiện trên mon-server</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span>default<span class="w"> </span>deny<span class="w"> </span>incoming
+sudo<span class="w"> </span>ufw<span class="w"> </span>default<span class="w"> </span>allow<span class="w"> </span>outgoing
+sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">22</span>/tcp<span class="w"> </span>comment<span class="w"> </span><span class="s2">"SSH"</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">80</span>/tcp<span class="w"> </span>comment<span class="w"> </span><span class="s2">"HTTP Redirect"</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span>allow<span class="w"> </span><span class="m">443</span>/tcp<span class="w"> </span>comment<span class="w"> </span><span class="s2">"HTTPS Reverse Proxy"</span>
+sudo<span class="w"> </span>ufw<span class="w"> </span><span class="nb">enable</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>6. Kịch bản Kiểm thử Bảo mật và Bảng Checklist Hardening</h2>
+<h3>Bảng Kiểm Tra An Ninh Toàn Diện (Security Hardening Checklist):</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Hạng mục kiểm tra</th>
+<th style="text-align:left">Tiêu chuẩn An ninh Production</th>
+<th style="text-align:center">Trạng thái đạt được</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Mã hóa đường truyền</strong></td>
+<td style="text-align:left">Bắt buộc 100% qua HTTPS/TLS 1.2+, cấm hoàn toàn HTTP thô</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Bảo vệ Endpoint Scrape</strong></td>
+<td style="text-align:left">Node Exporter được khóa bằng Basic Auth (bcrypt)</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Bảo vệ Prometheus UI</strong></td>
+<td style="text-align:left">Yêu cầu xác thực danh tính trước khi truy cập</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tường lửa Cô lập</strong></td>
+<td style="text-align:left">Chỉ IP máy chủ giám sát mới được chạm vào cổng 9100</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Chống xóa dữ liệu TSDB</strong></td>
+<td style="text-align:left">Vô hiệu hóa hoàn toàn Admin API trên Prometheus</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Kiểm soát Truy cập Grafana</strong></td>
+<td style="text-align:left">Tắt Anonymous, tắt User Registration, áp dụng RBAC</td>
+<td style="text-align:center">✅ Đạt</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>VI. Optimization</h1>
+<h2>1. Quản lý Metric Cardinality và Kỹ thuật Relabeling</h2>
+<h3>1.1. Vấn đề &quot;Bùng nổ Số lượng Chuỗi&quot; (High Cardinality Explosion)</h3>
+<p>Trong Prometheus, mỗi một sự kết hợp duy nhất giữa <strong>Tên metric</strong> và <strong>Tập hợp các giá trị nhãn (Labels)</strong> tạo thành một Time Series riêng biệt:
+$$\text{Total Time Series} = \prod (\text{Số lượng giá trị của từng Label})$$
+Nếu một kỹ sư sơ ý gắn các nhãn có độ biến thiên cao (High Cardinality) như <code>user_id</code>, <code>email</code>, <code>session_token</code>, hoặc <code>ip_client</code> vào metric, số lượng chuỗi thời gian sẽ bùng nổ lên tới hàng chục triệu chuỗi. Hệ quả là bộ nhớ RAM bị tràn, kích thước chỉ mục TSDB phình to và thời gian thực thi truy vấn PromQL bị treo.</p>
+<h3>1.2. Kỹ thuật Relabeling để Làm sạch và Lọc Dữ liệu</h3>
+<p>Prometheus cung cấp tính năng <strong><code>metric_relabel_configs</code></strong> cho phép can thiệp, biến đổi hoặc xóa bỏ các metric/label không mong muốn ngay trước khi mẫu dữ liệu được lưu vào TSDB:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">'node_exporter'</span>
+<span class="w">    </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">'192.168.122.38:9100'</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">metric_relabel_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># 1. Loại bỏ các nhãn dư thừa gây tốn bộ nhớ</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">'help|version|git_commit'</span>
+<span class="w">        </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">labeldrop</span>
+
+<span class="w">      </span><span class="c1"># 2. Bỏ qua các mountpoint tạm thời không cần giám sát đĩa</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__name__</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">mountpoint</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">'node_filesystem_.*`;(/var/lib/docker/.*|/run/.*|/snap/.*)'</span>
+<span class="w">        </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">drop</span>
+
+<span class="w">      </span><span class="c1"># 3. Chuẩn hóa tên nhãn máy chủ</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">instance</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hostname</span>
+<span class="w">        </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">'(.*):9100'</span>
+<span class="w">        </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">'${1}'</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>2. Tối ưu hóa Truy vấn với Recording Rules trong Prometheus</h2>
+<h3>2.1. Bản chất và Ý tưởng Triển khai Recording Rules</h3>
+<p>Trong thực tế, một bảng điều khiển Grafana gồm nhiều đồ thị phức tạp sẽ liên tục gửi các truy vấn PromQL nặng nề (ví dụ: tính trung bình tỷ lệ CPU qua nhiều lõi, gom nhóm theo máy chủ) mỗi 5 giây. Nếu có 10 người cùng mở Dashboard, Prometheus sẽ phải lặp đi lặp lại việc quét hàng triệu điểm dữ liệu thô chỉ để cho ra một kết quả giống nhau, gây lãng phí CPU nghiêm trọng.</p>
+<p><strong>Recording Rules</strong> cho phép Prometheus định kỳ tính toán trước (pre-compute) các biểu thức PromQL nặng và lưu kết quả thành một <strong>metric mới hoàn toàn</strong> trong TSDB:</p>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart LR
+    subgraph Traditional ["Quy trình Cũ: Chưa có Recording Rules"]
+        direction TB
+        Raw1[("Dữ liệu Thô (Raw TSDB)<br/>node_cpu_seconds_total")]
+        Engine1["PromQL Query Engine<br/>Tính toán lặp lại biểu thức nặng"]
+        Clients1["Grafana & Alertmanager<br/>Quét hàng triệu mẫu mỗi 5s<br/>(CPU quá tải, phản hồi chậm)"]
+
+        Raw1 -->|"Quét hàng triệu mẫu thô"| Engine1
+        Engine1 -->|"Tính toán nặng tốn CPU"| Clients1
+    end
+
+    subgraph Optimized ["Quy trình Mới: Đã có Recording Rules"]
+        direction TB
+        Raw2[("Dữ liệu Thô (Raw TSDB)")]
+        Rule["Background Recording Rule<br/>instance:cpu_usage:percent<br/>(Prometheus tính trước mỗi 15s)"]
+        PreTSDB[("Metric Đã Tính Sẵn (Pre-computed)<br/>Lưu kết quả mới vào TSDB")]
+        Clients2["Grafana & Alertmanager<br/>Truy vấn chuỗi đã tính sẵn<br/>(Thời gian phản hồi < 1ms)"]
+
+        Raw2 -->|"Định kỳ tính trước 15s"| Rule
+        Rule -->|"Lưu chuỗi mới vào TSDB"| PreTSDB
+        PreTSDB -->|"Đọc tức thì < 1ms"| Clients2
+    end
+
+    Traditional ~~~ Optimized
+</pre></div></code></pre>
+<h3>2.2. Chuẩn mực Đặt tên Metric (Naming Convention)</h3>
+<p>Tên Recording Rule chuẩn mực phải tuân thủ cấu trúc:
+$$\text{level}:\text{metric}:\text{operation}$$</p>
+<ul>
+<li><code>instance:cpu_usage:percent</code>: Mức độ chi tiết theo từng instance, thể hiện tỷ lệ % CPU sử dụng.</li>
+<li><code>instance:memory_usage:percent</code>: Mức độ theo instance, thể hiện tỷ lệ % RAM sử dụng.</li>
+<li><code>job:http_requests:rate5m</code>: Mức độ theo job, thể hiện tốc độ request trung bình 5 phút.</li>
+</ul>
+<h3>2.3. Thiết kế File Recording Rules (<code>/etc/prometheus/recording_rules.yml</code>)</h3>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">groups</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">system_recording_rules</span>
+<span class="w">    </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span>
+<span class="w">    </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w">      </span><span class="c1"># 1. Tính toán trước Tỷ lệ sử dụng CPU</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">instance:cpu_usage:percent</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])))</span>
+
+<span class="w">      </span><span class="c1"># 2. Tính toán trước Tỷ lệ sử dụng Bộ nhớ RAM</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">instance:memory_usage:percent</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100 * (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes))</span>
+
+<span class="w">      </span><span class="c1"># 3. Tính toán trước Tỷ lệ sử dụng Ổ cứng phân vùng gốc</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">instance:disk_usage:percent</span>
+<span class="w">        </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100 * (1 - (node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}))</span>
+</code></pre></div></code></pre>
+<p>Khai báo vào <code>prometheus.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">rule_files</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'/etc/prometheus/recording_rules.yml'</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'/etc/prometheus/alert_rules.yml'</span>
+</code></pre></div></code></pre>
+<p>Kiểm tra cú pháp và hot-reload:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash">promtool<span class="w"> </span>check<span class="w"> </span>rules<span class="w"> </span>/etc/prometheus/recording_rules.yml
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:9090/-/reload
+</code></pre></div></code></pre>
+<h3>2.4. So sánh Hiệu năng Truy vấn Trước và Sau khi Tối ưu:</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tiêu chí</th>
+<th style="text-align:left">Trước khi dùng Recording Rule</th>
+<th style="text-align:left">Sau khi dùng Recording Rule</th>
+<th style="text-align:center">Mức độ cải thiện</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Biểu thức truy vấn</strong></td>
+<td style="text-align:left"><code>100 * (1 - avg by(instance) (rate(node_cpu_seconds_total{mode=&quot;idle&quot;}[1m])))</code></td>
+<td style="text-align:left"><code>instance:cpu_usage:percent</code></td>
+<td style="text-align:center">Đơn giản hóa 90%</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Số mẫu quét (Samples scanned)</strong></td>
+<td style="text-align:left">Quét toàn bộ các lõi CPU x 12 điểm đo trong 1 phút</td>
+<td style="text-align:left">Quét đúng <strong>1 mẫu duy nhất</strong> đã được tính sẵn</td>
+<td style="text-align:center">Giảm 95% I/O đĩa</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Thời gian phản hồi truy vấn</strong></td>
+<td style="text-align:left">120ms - 250ms (khi dữ liệu nhiều ngày)</td>
+<td style="text-align:left"><strong>2ms - 5ms</strong></td>
+<td style="text-align:center"><strong>Tăng tốc ~50 lần</strong></td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tải CPU trên Prometheus</strong></td>
+<td style="text-align:left">Cao và tăng tuyến tính theo số người xem</td>
+<td style="text-align:left">Thấp và ổn định tuyệt đối</td>
+<td style="text-align:center">Tiết kiệm 40% CPU</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>3. Application Performance Monitoring (APM) &amp; Golden Signals</h2>
+<p>Hệ thống giám sát chuyên nghiệp không dừng lại ở mức tài nguyên máy chủ (OS level) mà phải mở rộng tới tầng ứng dụng (Application level).</p>
+<h3>4 Tín hiệu Vàng (The Four Golden Signals - Google SRE Book):</h3>
+<ol>
+<li><strong>Latency (Độ trễ):</strong> Thời gian để ứng dụng phản hồi một yêu cầu (tách biệt giữa request thành công và thất bại).</li>
+<li><strong>Traffic (Lưu lượng):</strong> Thước đo nhu cầu đặt lên hệ thống (ví dụ: HTTP requests/giây, số lượng người dùng đồng thời).</li>
+<li><strong>Errors (Tỷ lệ lỗi):</strong> Tốc độ phát sinh lỗi (ví dụ: tỷ lệ HTTP 500 so với tổng số request).</li>
+<li><strong>Saturation (Mức độ bão hòa):</strong> Mức độ căng thẳng của tài nguyên (ví dụ: dung lượng hàng đợi xử lý còn trống bao nhiêu %).</li>
+</ol>
+<h3>Triển khai Custom Metrics cho Ứng dụng Python (<code>prometheus_client</code>):</h3>
+<pre><code class="language-python"><div class="highlight cmd-box"><div class="lang-badge">python</div><pre><code class="language-python"><span class="kn">from</span><span class="w"> </span><span class="nn">prometheus_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_http_server</span><span class="p">,</span> <span class="n">Counter</span><span class="p">,</span> <span class="n">Histogram</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="c1"># 1. Định nghĩa Counter đếm số đơn hàng</span>
+<span class="n">ORDERS_TOTAL</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="s1">'app_orders_created_total'</span><span class="p">,</span> <span class="s1">'Tổng số đơn hàng được tạo'</span><span class="p">,</span> <span class="p">[</span><span class="s1">'payment_method'</span><span class="p">])</span>
+
+<span class="c1"># 2. Định nghĩa Histogram đo độ trễ API</span>
+<span class="n">REQUEST_LATENCY</span> <span class="o">=</span> <span class="n">Histogram</span><span class="p">(</span><span class="s1">'app_request_latency_seconds'</span><span class="p">,</span> <span class="s1">'Thời gian phản hồi API'</span><span class="p">,</span> <span class="p">[</span><span class="s1">'endpoint'</span><span class="p">])</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">process_order</span><span class="p">():</span>
+    <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+    <span class="c1"># Giả lập xử lý thanh toán</span>
+    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.05</span><span class="p">)</span>
+    <span class="n">ORDERS_TOTAL</span><span class="o">.</span><span class="n">labels</span><span class="p">(</span><span class="n">payment_method</span><span class="o">=</span><span class="s1">'credit_card'</span><span class="p">)</span><span class="o">.</span><span class="n">inc</span><span class="p">()</span>
+    <span class="n">REQUEST_LATENCY</span><span class="o">.</span><span class="n">labels</span><span class="p">(</span><span class="n">endpoint</span><span class="o">=</span><span class="s1">'/api/v1/order'</span><span class="p">)</span><span class="o">.</span><span class="n">observe</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">'__main__'</span><span class="p">:</span>
+    <span class="c1"># Mở cổng 8000 phục vụ Prometheus scrape</span>
+    <span class="n">start_http_server</span><span class="p">(</span><span class="mi">8000</span><span class="p">)</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">process_order</span><span class="p">()</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>4. Tinh chỉnh Bộ máy Lưu trữ Nội tại (TSDB Engine Tuning)</h2>
+<p>Bộ máy lưu trữ chuỗi thời gian (TSDB) của Prometheus được thiết kế chuyên biệt cho tải đọc/ghi khối lượng lớn dữ liệu số theo thời gian thực. Để hệ thống vận hành bền bỉ trên môi trường Linux Server với tài nguyên RAM và I/O giới hạn, cần hiểu rõ cơ chế nội tại và áp dụng các phương pháp tinh chỉnh toàn diện:</p>
+<h3>4.1. Kiến trúc Vòng đời Dữ liệu TSDB (TSDB Lifecycle &amp; Block Layout)</h3>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart TD
+    subgraph Ingestion ["Giai đoạn 1: Thu nhận & Bộ nhớ Tạm (RAM & WAL)"]
+        direction LR
+        Scrape["Scrape Loop<br/>(Mẫu Metric Mới)"]
+        WAL["Write-Ahead Log (WAL)<br/>(Ghi tuần tự an toàn ra đĩa)"]
+        Head["Head Block (In-Memory)<br/>(Lưu RAM phục vụ truy vấn)"]
+        Scrape ==>|"Ghi an toàn"| WAL
+        Scrape ==>|"Nạp bộ nhớ"| Head
+    end
+
+    subgraph Storage ["Giai đoạn 2: Đóng băng & Cấu trúc Khối Đĩa Bất biến (data/UUID/)"]
+        direction LR
+        MM["Memory-Mapped Chunks<br/>(Ánh xạ bộ nhớ đệm)"]
+        
+        subgraph Block_Files ["Cấu trúc 1 Thư mục Block (UUID/)"]
+            direction TB
+            F1["meta.json (chu kỳ thời gian)"]
+            F2["index (Chỉ mục Bitmap)"]
+            F3["chunks/ (Dữ liệu nén Gorilla)"]
+            F4["tombstones (Bản ghi xóa logic)"]
+        end
+
+        Cleaner["Retention Engine<br/>(Dọn dẹp FIFO theo time/size)"]
+
+        MM ==>|"Compactor nén 2h"| Block_Files
+        Block_Files ==>|"Cũ hơn retention"| Cleaner
+    end
+
+    Head ==>|"Đủ 120 mẫu / 2 giờ"| MM
+</pre></div></code></pre>
+<h4>Giải thích cấu trúc thư mục Block trên đĩa (<code>/var/lib/prometheus/data/</code>):</h4>
+<ul>
+<li><strong><code>chunks/</code></strong>: Chứa các tệp lưu trữ dữ liệu chuỗi thời gian đã được nén bằng thuật toán <strong>Gorilla/XOR float64</strong>, mỗi mẫu dữ liệu chỉ tốn khoảng 1.3 - 2 bytes.</li>
+<li><strong><code>index</code></strong>: Tệp chỉ mục nhãn (Inverted Index) dạng Bitmap nhị phân, cho phép truy vấn cực nhanh hàng triệu chuỗi dữ liệu theo bất kỳ nhãn nào mà không phải quét toàn bộ ổ cứng.</li>
+<li><strong><code>meta.json</code></strong>: Chứa thông tin siêu dữ liệu (thời gian bắt đầu <code>minTime</code>, thời gian kết thúc <code>maxTime</code>, số lượng chuỗi dữ liệu, số mẫu và thế hệ compaction).</li>
+<li><strong><code>tombstones</code></strong>: Khi có yêu cầu xóa metric, TSDB không xóa vật lý ngay mà chỉ ghi vào <code>tombstones</code> để đảm bảo tốc độ và an toàn I/O; dữ liệu chỉ bị loại bỏ hoàn toàn khi diễn ra chu kỳ Compaction tiếp theo.</li>
+</ul>
+<hr />
+<h3>4.2. Bộ cờ Cấu hình Khởi chạy Tối ưu hóa TSDB (Production CLI Flags)</h3>
+<p>Chỉnh sửa tệp cấu hình tham số khởi chạy của Prometheus (<code>/etc/default/prometheus</code> trên Debian/Ubuntu hoặc file systemd service):</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># /etc/default/prometheus</span>
+<span class="nv">ARGS</span><span class="o">=</span><span class="s2">"--config.file=/etc/prometheus/prometheus.yml \</span>
+<span class="s2">      --storage.tsdb.path=/var/lib/prometheus/data \</span>
+<span class="s2">      --storage.tsdb.retention.time=15d \</span>
+<span class="s2">      --storage.tsdb.retention.size=10GB \</span>
+<span class="s2">      --storage.tsdb.wal-compression \</span>
+<span class="s2">      --storage.tsdb.min-block-duration=2h \</span>
+<span class="s2">      --storage.tsdb.max-block-duration=2h \</span>
+<span class="s2">      --storage.tsdb.wal-segment-size=128MB \</span>
+<span class="s2">      --query.max-samples=50000000 \</span>
+<span class="s2">      --query.timeout=2m \</span>
+<span class="s2">      --query.max-concurrency=20 \</span>
+<span class="s2">      --web.enable-lifecycle"</span>
+</code></pre></div></code></pre>
+<h4>Chi tiết tác dụng kỹ thuật của từng tham số:</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Cờ Tham số (CLI Flag)</th>
+<th style="text-align:left">Giá trị khuyến nghị</th>
+<th style="text-align:left">Ý nghĩa và Lợi ích vận hành</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>--storage.tsdb.wal-compression</code></td>
+<td style="text-align:left"><code>enabled</code> (mặc định)</td>
+<td style="text-align:left">Bật thuật toán nén Snappy cho các tệp WAL, <strong>giảm 30% đến 50% dung lượng ghi đĩa</strong> và băng thông I/O.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--storage.tsdb.min-block-duration</code></td>
+<td style="text-align:left"><code>2h</code></td>
+<td style="text-align:left">Thời gian khối block tối thiểu trước khi cắt thành block bất biến. Cố định 2h giúp đồng bộ hoàn hảo với Thanos Sidecar.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--storage.tsdb.max-block-duration</code></td>
+<td style="text-align:left"><code>2h</code></td>
+<td style="text-align:left">Cố định khối block tối đa là 2 giờ, ngăn Prometheus tự động gộp các block quá to làm chậm tiến trình đẩy lên Object Storage.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--storage.tsdb.retention.time</code></td>
+<td style="text-align:left"><code>15d</code></td>
+<td style="text-align:left">Thời gian lưu trữ cục bộ tối đa. Dữ liệu cũ hơn 15 ngày sẽ tự động bị xóa.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--storage.tsdb.retention.size</code></td>
+<td style="text-align:left"><code>10GB</code></td>
+<td style="text-align:left">Giới hạn dung lượng thư mục TSDB. Nếu vượt ngưỡng 10GB, TSDB tự động dọn dẹp các khối cũ nhất theo cơ chế FIFO.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--query.max-samples</code></td>
+<td style="text-align:left"><code>50000000</code></td>
+<td style="text-align:left">Giới hạn số mẫu tối đa được nạp vào RAM cho một biểu thức truy vấn, <strong>ngăn chặn sự cố Out-Of-Memory (OOM)</strong> khi người dùng vô tình quét khoảng thời gian quá dài.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--query.timeout</code></td>
+<td style="text-align:left"><code>2m</code></td>
+<td style="text-align:left">Thời gian chờ tối đa cho một truy vấn PromQL trước khi hủy bỏ để giải phóng tài nguyên CPU.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>--query.max-concurrency</code></td>
+<td style="text-align:left"><code>20</code></td>
+<td style="text-align:left">Giới hạn số lượng truy vấn PromQL chạy đồng thời, tránh hiện tượng nghẽn hàng đợi xử lý.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>4.3. Tinh chỉnh Hệ điều hành Linux Kernel và I/O Subsystem</h3>
+<p>Bên cạnh tham số ứng dụng, tầng hệ điều hành Linux đóng vai trò quyết định tới độ ổn định của TSDB:</p>
+<h4>1. Mở rộng giới hạn Bộ nhớ ảo (<code>vm.max_map_count</code>):</h4>
+<p>Prometheus TSDB sử dụng rất nhiều lệnh gọi hệ thống <code>mmap()</code> để ánh xạ trực tiếp các khối block trên đĩa vào không gian địa chỉ bộ nhớ ảo. Mặc định trên Linux giá trị này chỉ là <code>65530</code>, dễ dẫn đến lỗi <code>&quot;cannot allocate memory&quot;</code> khi số lượng block tăng lên.</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Thêm vào /etc/sysctl.d/99-prometheus.conf</span>
+vm.max_map_count<span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="m">262144</span>
+
+<span class="c1"># Nạp cấu hình ngay lập tức:</span>
+sudo<span class="w"> </span>sysctl<span class="w"> </span>-p<span class="w"> </span>/etc/sysctl.d/99-prometheus.conf
+</code></pre></div></code></pre>
+<h4>2. Tinh chỉnh Giới hạn Tệp Mở (File Descriptors):</h4>
+<p>Mỗi chunk và socket kết nối đều tiêu tốn một file descriptor. Cần nâng giới hạn trong file dịch vụ systemd <code>/etc/systemd/system/prometheus.service</code>:</p>
+<pre><code class="language-ini"><div class="highlight cmd-box"><div class="lang-badge">ini</div><pre><code class="language-ini"><span class="k">[Service]</span>
+<span class="na">LimitNOFILE</span><span class="o">=</span><span class="s">65536</span>
+<span class="na">LimitNPROC</span><span class="o">=</span><span class="s">4096</span>
+</code></pre></div></code></pre>
+<h4>3. Tối ưu hóa I/O File System Mount:</h4>
+<p>Đảm bảo thư mục lưu trữ <code>/var/lib/prometheus</code> được gắn trên phân vùng riêng biệt với các tùy chọn mount:</p>
+<pre><code class="language-text"><div class="highlight cmd-box"><div class="lang-badge">text</div><pre><code class="language-text">/dev/sdb1  /var/lib/prometheus  ext4  noatime,nodiratime,data=ordered,barrier=1  0  2
+</code></pre></div></code></pre>
+<ul>
+<li><code>noatime,nodiratime</code>: Loại bỏ việc cập nhật thời gian đọc tệp (Access Time), giảm triệt để các thao tác ghi đĩa vô ích.</li>
+</ul>
+<hr />
+<h3>4.4. Quy tắc Chọn Range Vector và Time Window Chuẩn mực cho PromQL</h3>
+<p>Một lỗi phổ biến khiến đồ thị trên Grafana bị đứt đoạn hoặc gãy nét (gap) là chọn cửa sổ thời gian (Range Vector) quá ngắn cho hàm <code>rate()</code> hoặc <code>irate()</code>:</p>
+<blockquote>
+<p>[!IMPORTANT]
+<strong>Quy tắc Bắt buộc:</strong> <code>Range Vector Window &gt;= 4 * scrape_interval</code><br />
+<em>(Độ dài cửa sổ thời gian của hàm <code>rate()</code> hoặc <code>irate()</code> phải tối thiểu gấp 4 lần chu kỳ <code>scrape_interval</code>)</em></p>
+</blockquote>
+<pre><code class="language-mermaid"><div class="mermaid-wrap"><pre class="mermaid">flowchart LR
+    subgraph Bad_Query ["Cửa sổ quá ngắn: rate(5s) với scrape 5s"]
+        S1["Sample 1"] --- Gap["Khoảng trống / Mất mẫu"] --- S2["Sample 2"]
+        Gap --> Error["Lỗi: Không đủ 2 điểm đo -> Đồ thị bị đứt nét"]
+    end
+
+    subgraph Good_Query ["Cửa sổ chuẩn: rate(1m) với scrape 5s"]
+        M1["Sample 1"] --- M2["Sample 2"] --- M3["Sample 3"] --- M4["Sample 4"] --- M12["...12 Samples"]
+        M12 --> Smooth["Tính gradient mượt mà & chính xác 100%"]
+    end
+</pre></div></code></pre>
+<h4>Bảng Quy chuẩn Tương quan Chu kỳ Scrape và Range Vector:</h4>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Chu kỳ cào dữ liệu (<code>scrape_interval</code>)</th>
+<th style="text-align:left">Cửa sổ tối thiểu lý thuyết (2×)</th>
+<th style="text-align:left">Cửa sổ Production Khuyến nghị (4× - 12×)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>5 giây</strong> (<code>5s</code>)</td>
+<td style="text-align:left"><code>[10s]</code></td>
+<td style="text-align:left"><strong><code>[1m]</code></strong> (Chứa ~12 mẫu đo, triệt tiêu nhiễu giật cục)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>15 giây</strong> (<code>15s</code>)</td>
+<td style="text-align:left"><code>[30s]</code></td>
+<td style="text-align:left"><strong><code>[2m]</code></strong> (Chứa ~8 mẫu đo)</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>30 giây</strong> (<code>30s</code>)</td>
+<td style="text-align:left"><code>[1m]</code></td>
+<td style="text-align:left"><strong><code>[5m]</code></strong> (Chuẩn mực cho dịch vụ quy mô lớn)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3>4.5. Bộ Công cụ Phân tích và Dọn dẹp TSDB Nội tại (<code>promtool tsdb</code>)</h3>
+<p>Prometheus cung cấp công cụ <code>promtool tsdb</code> giúp kỹ sư kiểm tra &quot;sức khỏe&quot;, phân tích top metric ngốn bộ nhớ nhất và bảo trì cơ sở dữ liệu:</p>
+<h4>1. Phân tích Top Metric chiếm tài nguyên lớn nhất (High Cardinality Investigator):</h4>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Phân tích sâu trực tiếp vào thư mục dữ liệu TSDB</span>
+promtool<span class="w"> </span>tsdb<span class="w"> </span>analyze<span class="w"> </span>/var/lib/prometheus/data
+</code></pre></div></code></pre>
+<p>Lệnh này xuất ra báo cáo chi tiết:</p>
+<ul>
+<li><strong>Top 10 Metrics có số lượng Series nhiều nhất.</strong></li>
+<li><strong>Top 10 Labels có số lượng giá trị đa dạng nhất.</strong></li>
+<li>Tổng số lượng Samples, Chunk, và Block hiện có.</li>
+</ul>
+<h4>2. Dọn dẹp Tombstone và Khối Block Lỗi:</h4>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="c1"># Kiểm tra tính toàn vẹn của toàn bộ các khối TSDB trên đĩa</span>
+promtool<span class="w"> </span>check<span class="w"> </span>config<span class="w"> </span>/etc/prometheus/prometheus.yml
+</code></pre></div></code></pre>
+<hr />
+<h1>VII. GitOps, Monitoring as Code</h1>
+<h2>1. Đặt vấn đề: Thảm họa ClickOps và Triết lý Monitoring-as-Code</h2>
+<h3>1.1. Thảm họa Vận hành Thủ công (ClickOps)</h3>
+<p>Trong cách làm truyền thống, kỹ sư đăng nhập vào giao diện web của Grafana để bấm chuột tạo Dashboard, hoặc đăng nhập SSH vào máy chủ để gõ lệnh thêm rule. Phương thức này gọi là <strong>ClickOps</strong> và mang lại những hậu quả nghiêm trọng:</p>
+<ul>
+<li><strong>Không có lịch sử phiên bản:</strong> Không ai biết ai đã sửa thông số cảnh báo nào vào lúc mấy giờ.</li>
+<li><strong>Không thể phục hồi thảm họa (Disaster Recovery):</strong> Nếu cơ sở dữ liệu <code>grafana.db</code> bị hỏng hoặc máy chủ bị cháy, toàn bộ công sức thiết kế Dashboard hàng tháng trời sẽ biến mất hoàn toàn.</li>
+<li><strong>Không thể nhân bản môi trường:</strong> Việc dựng lại một cụm giám sát mới cho môi trường Staging/Production đòi hỏi hàng giờ thao tác lặp lại dễ gây lỗi.</li>
+</ul>
+<h3>1.2. Triết lý Monitoring-as-Code (MaC) &amp; GitOps</h3>
+<p>Toàn bộ cấu hình nguồn dữ liệu, bảng điều khiển, quy tắc cảnh báo và danh sách máy chủ được định nghĩa dưới dạng <strong>Mã nguồn thuần túy (Declarative YAML/JSON)</strong> và lưu trữ trên Git Repository:</p>
+<ul>
+<li><strong>Git là Nguồn Chân lý Duy nhất (Single Source of Truth).</strong></li>
+<li>Mọi thay đổi đều phải thông qua Pull Request, Code Review và kiểm thử cú pháp tự động.</li>
+<li>Hệ thống tự động đồng bộ (Auto Reconciliation) trạng thái thực tế khớp với trạng thái khai báo trong Git.</li>
+</ul>
+<hr />
+<h2>2. Khai báo Nguồn dữ liệu và Dashboard Tự động (Grafana Provisioning)</h2>
+<p>Grafana hỗ trợ cơ chế <strong>Provisioning</strong>, tự động đọc và nạp toàn bộ cấu hình từ thư mục <code>/etc/grafana/provisioning/</code> khi dịch vụ khởi động:</p>
+<pre><code class="language-text"><div class="highlight cmd-box"><div class="lang-badge">text</div><pre><code class="language-text">/etc/grafana/provisioning/
+├── datasources/
+│   └── datasources.yml      # Tự động nạp Prometheus Data Source
+└── dashboards/
+    ├── dashboards.yml       # Khai báo thư mục chứa Dashboard JSON
+    └── definitions/
+        └── linux_host.json  # Toàn bộ mã JSON của biểu đồ giám sát
+</code></pre></div></code></pre>
+<h3>2.1. Tệp Khai báo Tự động Nguồn Dữ liệu (<code>datasources.yml</code>)</h3>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+
+<span class="nt">datasources</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prometheus-Production</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus</span>
+<span class="w">    </span><span class="nt">access</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>
+<span class="w">    </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://127.0.0.1:9090</span>
+<span class="w">    </span><span class="nt">isDefault</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">editable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"> </span><span class="c1"># Khóa không cho sửa qua giao diện Web để chống ClickOps</span>
+<span class="w">    </span><span class="nt">jsonData</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">timeInterval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w">      </span><span class="nt">httpMethod</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+</code></pre></div></code></pre>
+<h3>2.2. Tệp Khai báo Bảng Điều khiển (<code>dashboards.yml</code>)</h3>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+
+<span class="nt">providers</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">'Default</span><span class="nv"> </span><span class="s">Dashboards'</span>
+<span class="w">    </span><span class="nt">orgId</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">folder</span><span class="p">:</span><span class="w"> </span><span class="s">'Linux</span><span class="nv"> </span><span class="s">Infrastructure'</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file</span>
+<span class="w">    </span><span class="nt">disableDeletion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">updateIntervalSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w"> </span><span class="c1"># Tự động phát hiện khi file JSON thay đổi sau 10s</span>
+<span class="w">    </span><span class="nt">options</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/grafana/provisioning/dashboards/definitions</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>3. Cấp phát Mục tiêu Giám sát Động qua File-based Service Discovery</h2>
+<h3>3.1. Giới hạn của <code>static_configs</code></h3>
+<p>Khai báo cứng danh sách máy chủ trong <code>prometheus.yml</code> đòi hỏi kỹ sư phải chỉnh sửa file cấu hình chính và khởi động lại hoặc reload Prometheus mỗi khi có thêm một máy chủ mới vào hệ thống.</p>
+<h3>3.2. Cấu hình Dynamic Scrape qua <code>file_sd_configs</code></h3>
+<p>Sử dụng File-based Service Discovery cho phép Prometheus giám sát một thư mục chứa các tệp JSON/YAML. Khi danh sách máy chủ trong tệp thay đổi, Prometheus tự động cập nhật mục tiêu mới trong vòng <strong>5 giây</strong> mà không làm gián đoạn bất kỳ luồng cào nào khác:</p>
+<p>Cấu hình trong <code>prometheus.yml</code>:</p>
+<pre><code class="language-yaml"><div class="highlight cmd-box"><div class="lang-badge">yaml</div><pre><code class="language-yaml"><span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">'dynamic_nodes'</span>
+<span class="w">    </span><span class="nt">file_sd_configs</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">files</span><span class="p">:</span>
+<span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">'/etc/prometheus/targets/*.json'</span>
+<span class="w">        </span><span class="nt">refresh_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+</code></pre></div></code></pre>
+<p>Tệp danh sách máy chủ <code>/etc/prometheus/targets/nodes.json</code>:</p>
+<pre><code class="language-json"><div class="highlight cmd-box"><div class="lang-badge">json</div><pre><code class="language-json"><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"192.168.122.38:9100"</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"labels"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"hostname"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mon-target-01"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"env"</span><span class="p">:</span><span class="w"> </span><span class="s2">"production"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vn-north"</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"192.168.122.89:9100"</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"labels"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"hostname"</span><span class="p">:</span><span class="w"> </span><span class="s2">"mon-target-02"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"env"</span><span class="p">:</span><span class="w"> </span><span class="s2">"staging"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"region"</span><span class="p">:</span><span class="w"> </span><span class="s2">"vn-north"</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>4. Xây dựng Pipeline Triển khai Tự động An toàn (<code>deploy_stack.sh</code>)</h2>
+<p>Kịch bản tự động hóa kiểm tra tính hợp lệ của cấu hình, kiểm tra cú pháp bằng các công cụ chuyên dụng (<code>promtool</code>, <code>amtool</code>), đồng bộ file và thực hiện nạp lại cấu hình nóng (Hot-reload) mà không gây gián đoạn dịch vụ:</p>
+<pre><code class="language-bash"><div class="highlight cmd-box"><div class="lang-badge">bash</div><pre><code class="language-bash"><span class="ch">#!/usr/bin/env bash</span>
+<span class="c1"># scripts/deploy_stack.sh - Tự động đồng bộ và nạp cấu hình Monitoring Stack chuẩn GitOps</span>
+<span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail
+
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"=========================================================="</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"   BẮT ĐẦU QUY TRÌNH GITOPS TRIỂN KHAI HỆ THỐNG GIÁM SÁT   "</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"=========================================================="</span>
+
+<span class="nv">REPO_DIR</span><span class="o">=</span><span class="s2">"/home/archlinux/Projects/Linux/Seminar/linux_op_lab1"</span>
+
+<span class="c1"># 1. Kiểm tra tính hợp lệ cú pháp Prometheus &amp; Alertmanager</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"[+] Đang kiểm tra tính hợp lệ cú pháp cấu hình..."</span>
+promtool<span class="w"> </span>check<span class="w"> </span>config<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/prometheus.yml"</span>
+promtool<span class="w"> </span>check<span class="w"> </span>rules<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/alert_rules.yml"</span>
+promtool<span class="w"> </span>check<span class="w"> </span>rules<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/recording_rules.yml"</span>
+amtool<span class="w"> </span>check-config<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/alertmanager.yml"</span>
+
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"[✓] Toàn bộ file cấu hình đều vượt qua vòng kiểm thử an toàn!"</span>
+
+<span class="c1"># 2. Đồng bộ các tệp cấu hình vào thư mục hệ thống</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"[+] Đang đồng bộ cấu hình vào hệ thống /etc/..."</span>
+sudo<span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/prometheus.yml"</span><span class="w"> </span>/etc/prometheus/
+sudo<span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/alert_rules.yml"</span><span class="w"> </span>/etc/prometheus/
+sudo<span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/recording_rules.yml"</span><span class="w"> </span>/etc/prometheus/
+sudo<span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/alertmanager.yml"</span><span class="w"> </span>/etc/alertmanager/
+sudo<span class="w"> </span>cp<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/configs/alert.tmpl"</span><span class="w"> </span>/etc/alertmanager/
+
+<span class="c1"># 3. Đồng bộ Grafana Provisioning</span>
+sudo<span class="w"> </span>cp<span class="w"> </span>-r<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/provisioning/datasources/"</span>*<span class="w"> </span>/etc/grafana/provisioning/datasources/
+sudo<span class="w"> </span>cp<span class="w"> </span>-r<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">REPO_DIR</span><span class="si">}</span><span class="s2">/provisioning/dashboards/"</span>*<span class="w"> </span>/etc/grafana/provisioning/dashboards/
+
+<span class="c1"># 4. Kích hoạt Hot-reload không làm gián đoạn dịch vụ</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"[+] Kích hoạt Hot-reload cho Prometheus và Alertmanager..."</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:9090/-/reload
+curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://localhost:9093/-/reload
+
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"=========================================================="</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"   [✓] TRIỂN KHAI GITOPS THÀNH CÔNG KHÔNG DOWNTIME!      "</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">"=========================================================="</span>
+</code></pre></div></code></pre>
+<hr />
+<h2>5. Bảng So sánh Toàn diện Phương thức Vận hành ClickOps vs. GitOps</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Tiêu chí So sánh</th>
+<th style="text-align:left">Vận hành Thủ công (ClickOps)</th>
+<th style="text-align:left">Tự động hóa GitOps &amp; Monitoring as Code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Tốc độ Triển khai</strong></td>
+<td style="text-align:left">Chậm (mất hàng giờ bấm chuột thiết lập từng thành phần).</td>
+<td style="text-align:left">Siêu tốc (chỉ mất vài giây chạy script hoặc tự động qua Git push).</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Khả năng Phục hồi (DR)</strong></td>
+<td style="text-align:left">Rất kém: Nếu hỏng ổ cứng, toàn bộ Dashboard và Alert bị mất vĩnh viễn.</td>
+<td style="text-align:left">Tức thì: Chỉ cần chạy <code>deploy_stack.sh</code>, hệ thống tái sinh trong <strong>3 giây</strong>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Kiểm soát Phiên bản</strong></td>
+<td style="text-align:left">Không có: Khó xác định ai đã thay đổi cấu hình gây ra sự cố.</td>
+<td style="text-align:left">Hoàn hảo: Mọi thay đổi đều được lưu vết qua Git commit, tác giả, thời gian.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Kiểm thử An toàn</strong></td>
+<td style="text-align:left">Không có: Chỉnh sửa trực tiếp trên file sống, dễ gây sập dịch vụ do lỗi cú pháp.</td>
+<td style="text-align:left">Nghiêm ngặt: <code>promtool</code> và <code>amtool</code> kiểm tra cú pháp trước khi nạp vào hệ thống.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Tính Nhất quán</strong></td>
+<td style="text-align:left">Dễ sai lệch (Configuration Drift) giữa Staging và Production.</td>
+<td style="text-align:left">Nhất quán 100%: Mọi môi trường đều sinh ra từ một nguồn mã nguồn duy nhất.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Thời gian Downtime</strong></td>
+<td style="text-align:left">Cần khởi động lại (restart) dịch vụ, gây gián đoạn luồng cào dữ liệu.</td>
+<td style="text-align:left">Zero-downtime: Tận dụng cơ chế Hot-reload qua HTTP endpoint <code>/-/reload</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1>TỔNG KẾT BÁO CÁO VÀ HƯỚNG PHÁT TRIỂN</h1>
+<p>Báo cáo đã trình bày một cách toàn diện, có hệ thống và chuyên sâu từ nền tảng lý thuyết đến thực hành xây dựng hệ thống giám sát và cảnh báo chuẩn Production:</p>
+<ol>
+<li><strong>Phần I (Overview):</strong> Định vị vai trò sống còn của Observability, so sánh chi tiết Pull vs Push, làm rõ 4 loại metric chuẩn và bản chất bộ máy TSDB.</li>
+<li><strong>Phần II (Environment Setup):</strong> Xây dựng hạ tầng ảo hóa phân tán tự động trên nền tảng KVM/libvirt Debian 12 bằng công nghệ Copy-on-Write và Cloud-Init.</li>
+<li><strong>Phần III (HA &amp; Long-term Storage):</strong> Giải quyết triệt để điểm nghẽn lưu trữ của Prometheus bằng phân vùng tối ưu, mô hình Active-Active Replicas và giải pháp lưu trữ vĩnh viễn Thanos + MinIO.</li>
+<li><strong>Phần IV (Production Alerting):</strong> Hiện đại hóa hệ thống cảnh báo 3 lớp, dập tắt bão cảnh báo bằng cơ chế Grouping &amp; Inhibition, thiết kế mẫu Telegram HTML chuyên nghiệp và xây dựng công cụ ép RAM an toàn <code>auto_stress.py</code>.</li>
+<li><strong>Phần V (Security and Auth):</strong> Thiết lập bức tường an ninh vững chắc qua mã hóa Nginx TLS/HTTPS, xác thực Basic Auth bcrypt, siết chặt RBAC Grafana và cô lập tường lửa hạ tầng UFW.</li>
+<li><strong>Phần VI (Optimization):</strong> Tối ưu hóa hiệu năng truy vấn tăng tốc 50 lần nhờ Recording Rules, làm sạch nhãn chống bùng nổ Cardinality và mở rộng giám sát Golden Signals tầng ứng dụng.</li>
+<li><strong>Phần VII (GitOps &amp; Monitoring as Code):</strong> Chuyển dịch hoàn toàn sang phương thức vận hành hiện đại, tự động nạp nguồn dữ liệu và dashboard qua Grafana Provisioning, tự động nhận diện máy chủ qua File SD và triển khai an toàn không thời gian chết.</li>
+</ol>
+<p>Toàn bộ hệ thống được xây dựng đồng bộ, sẵn sàng ứng dụng trực tiếp vào môi trường vận hành hạ tầng thực tế của doanh nghiệp.</p>
+
+</body>
+</html>
